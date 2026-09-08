@@ -1,0 +1,287 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * DataDetective — design tokens
+ *
+ * The palette carries information rather than decoration. This product's
+ * whole claim is that a stated cause is traceable, so the colours encode
+ * exactly that distinction:
+ *
+ *   verified   teal    a claim whose calculation was re-run and matched
+ *   driver     teal    an explanation
+ *   assoc      amber   two things move together; not an explanation
+ *   measure    slate   what changed; not an explanation
+ *   alert      red     a defect in the data
+ *
+ * Nothing else in the interface is allowed to use those hues, so a colour
+ * always means the same thing wherever it appears.
+ * ------------------------------------------------------------------ */
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-ink-50: #f5f7fa;
+  --color-ink-100: #e9edf3;
+  --color-ink-200: #d3dbe6;
+  --color-ink-300: #adbaca;
+  --color-ink-400: #7d8da3;
+  --color-ink-500: #5a6b81;
+  --color-ink-600: #435265;
+  --color-ink-700: #2c3849;
+  --color-ink-800: #18222f;
+  --color-ink-900: #0e1620;
+  --color-ink-950: #070d14;
+
+  /* verification / driver */
+  --color-signal-300: #6fe9cf;
+  --color-signal-400: #35d6b4;
+  --color-signal-500: #12b894;
+  --color-signal-600: #0a8f73;
+  --color-signal-700: #0a6f5b;
+
+  /* association / caution */
+  --color-amber-soft: #f0b429;
+  --color-amber-deep: #a86b00;
+
+  /* defects */
+  --color-alert-soft: #f2555a;
+  --color-alert-deep: #b3252b;
+
+  --radius-card: 14px;
+}
+
+/* Semantic surfaces, flipped by the `dark` class on <html>. Components
+   reference these rather than raw palette values, so theming stays in one
+   place instead of being sprinkled through every file as dark: variants. */
+:root {
+  --surface-page: #f2f5f9;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e8edf4;
+  --surface-inset: #f6f8fb;
+  --border-hairline: #dae1ea;
+  --border-strong: #c2ccd9;
+  --text-primary: #0e1620;
+  --text-secondary: #4c5b6f;
+  --text-muted: #7d8da3;
+  --accent: #0a8f73;
+  --accent-quiet: #e2f6f0;
+  --shadow-card: 0 1px 2px rgba(14, 22, 32, 0.05), 0 8px 24px -16px rgba(14, 22, 32, 0.3);
+}
+
+html.dark {
+  --surface-page: #070d14;
+  --surface-raised: #0e1620;
+  --surface-sunken: #18222f;
+  --surface-inset: #121c27;
+  --border-hairline: #22303f;
+  --border-strong: #33445a;
+  --text-primary: #e9edf3;
+  --text-secondary: #adbaca;
+  --text-muted: #7d8da3;
+  --accent: #35d6b4;
+  --accent-quiet: #0d2b25;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -20px rgba(0, 0, 0, 0.9);
+}
+
+* {
+  border-color: var(--border-hairline);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1; /* tabular figures: numbers must align in tables */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard focus stays visible everywhere. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+  border: 3px solid var(--surface-page);
+}
+
+/* ---------------------------------------------------------------- *
+ * Motion
+ *
+ * One orchestrated entrance on first paint, and transitions that answer
+ * a click. No ambient animation — a screen full of drifting cards makes
+ * numbers feel less trustworthy, which is the opposite of the point.
+ * ---------------------------------------------------------------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes trace {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.rise {
+  animation: rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    var(--surface-inset) 50%,
+    var(--surface-sunken) 75%
+  );
+  background-size: 200% 100%;
+  animation: sweep 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* The evidence thread: a hairline that physically connects a claim to the
+   calculation beneath it. This is the one piece of ornament in the product,
+   and it exists because connectedness IS the product's argument. */
+.thread {
+  position: relative;
+}
+.thread::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 22px;
+  bottom: -4px;
+  width: 1px;
+  background: linear-gradient(var(--border-strong), transparent);
+}
+.thread:last-child::before {
+  display: none;
+}
+
+
+/* ---------------------------------------------------------------- *
+ * Print
+ *
+ * The report is a deliverable people hand to someone else, so printing
+ * has to produce a document rather than a screenshot of an application.
+ * Navigation, tabs and controls are stripped; the report itself becomes
+ * the page.
+ * ---------------------------------------------------------------- */
+@media print {
+  @page {
+    margin: 18mm 16mm;
+  }
+
+  /* force the light palette: dark mode wastes ink and reads badly on paper */
+  html.dark {
+    --surface-page: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-sunken: #f2f5f9;
+    --surface-inset: #f6f8fb;
+    --border-hairline: #d3dbe6;
+    --border-strong: #adbaca;
+    --text-primary: #0e1620;
+    --text-secondary: #2c3849;
+    --text-muted: #435265;
+    --accent: #0a6f5b;
+    --accent-quiet: #eef6f4;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  /* the breakdown bars and the headline rule carry meaning, so the browser
+     must not strip their backgrounds when printing */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* the sidebar gutter goes with the sidebar */
+  .app-shell {
+    padding-left: 0 !important;
+  }
+
+  /* the report panel becomes the sheet */
+  .print-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  main,
+  main > div {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Keep a finding together with its evidence line, but let sections flow.
+     Making whole sections unbreakable pushes a long table onto the next page
+     and leaves half a sheet blank. */
+  li,
+  article,
+  tr {
+    break-inside: avoid;
+  }
+
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}
