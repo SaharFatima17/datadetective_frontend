@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { api, onSignedOut, setToken } from "./api";
+import { api, getToken, onSignedOut, setToken } from "./api";
 import { Sidebar, TopBar } from "./components/Nav";
+import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
 import DatasetDetail from "./pages/DatasetDetail";
 import Investigations from "./pages/Investigations";
@@ -15,6 +16,10 @@ const PAGE = {
   "/": {
     title: "Dashboard",
     subtitle: "Ask a question, or pick up where an investigation paused",
+  },
+  "/chat": {
+    title: "Chat",
+    subtitle: "Ask in your own words — attach data, answer questions, get a report",
   },
   "/sources": {
     title: "Sources",
@@ -31,6 +36,11 @@ const PAGE = {
 function usePageMeta() {
   const { pathname } = useLocation();
   if (PAGE[pathname]) return PAGE[pathname];
+  if (pathname.startsWith("/chat/"))
+    return {
+      title: "Chat",
+      subtitle: "Ask in your own words — attach data, answer questions, get a report",
+    };
   if (pathname.startsWith("/sources/"))
     return { title: "Dataset", subtitle: "Health, columns, cleaning and lineage" };
   if (pathname.startsWith("/investigations/"))
@@ -56,6 +66,8 @@ function useTheme() {
 
 export default function App() {
   const [user, setUser] = useState(null);
+  // null while we find out whether the stored session is still valid
+  const [restoring, setRestoring] = useState(Boolean(getToken()));
   const [provider, setProvider] = useState(null);
   const [navOpen, setNavOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
@@ -63,16 +75,40 @@ export default function App() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    onSignedOut(() => setUser(null));
+    onSignedOut(() => {
+      setUser(null);
+      setRestoring(false);
+    });
     api
       .info()
       .then((info) => setProvider(info.llm_provider))
       .catch(() => {});
+
+    // A stored token is only a claim; the server decides whether it is still
+    // good. Asking now avoids showing a workspace that every request rejects.
+    if (getToken()) {
+      api
+        .me()
+        .then(setUser)
+        .catch(() => setToken(null))
+        .finally(() => setRestoring(false));
+    }
   }, []);
 
   useEffect(() => {
     setNavOpen(false);
   }, [pathname]);
+
+  if (restoring) {
+    return (
+      <div className="grid min-h-screen place-items-center">
+        <div className="flex items-center gap-2 text-[13px] text-[var(--text-muted)]">
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          Restoring your session
+        </div>
+      </div>
+    );
+  }
 
   if (!user) return <Login onSignedIn={setUser} />;
 
@@ -98,6 +134,8 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/" element={<Dashboard user={user} />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/chat/:id" element={<Chat />} />
           <Route path="/sources" element={<Sources />} />
           <Route path="/sources/:id" element={<DatasetDetail />} />
           <Route path="/investigations" element={<Investigations />} />

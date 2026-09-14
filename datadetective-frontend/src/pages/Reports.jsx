@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText } from "lucide-react";
+import { BookOpen, FileText } from "lucide-react";
 import { api } from "../api";
 import {
   Badge,
@@ -91,6 +91,42 @@ export default function Reports() {
                         v{report.version}
                       </span>
                     </div>
+
+                    {/* What the knowledge base contributed to this report.
+                        The findings say what the data showed; these say what
+                        the agents read while deciding what to look for. Without
+                        it, a reader cannot tell whether a document they added
+                        made any difference. */}
+                    {(() => {
+                      const consulted = [
+                        ...(report.retrieval?.definitions_used || []),
+                        ...(report.retrieval?.context_documents || []),
+                      ];
+                      if (!consulted.length) return null;
+                      return (
+                        <div
+                          className="mt-3 rounded-lg border px-3 py-2.5"
+                          style={{ background: "var(--surface-inset)" }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <BookOpen size={13} className="text-[var(--text-muted)]" />
+                            <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                              From the knowledge base
+                            </span>
+                          </div>
+                          <ul className="mt-1.5 space-y-0.5">
+                            {consulted.map((d, i) => (
+                              <li
+                                key={i}
+                                className="truncate text-[12.5px] text-[var(--text-muted)]"
+                              >
+                                {d}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <Button size="sm" onClick={() => navigate(`/investigations/${inv.id}`)}>
                     Open
@@ -115,3 +151,5 @@ export default function Reports() {
     </div>
   );
 }
+
+

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, HelpCircle, Lightbulb, Upload } from "lucide-react";
+import { ArrowLeft, BookOpen, GitCompare, HelpCircle, Lightbulb, Upload } from "lucide-react";
 import { api } from "../api";
 import ForecastChart from "../components/ForecastChart";
 import RecommendationCard from "../components/RecommendationCard";
@@ -26,6 +26,131 @@ const FINDING_TONE = {
   measurement: "measurement",
 };
 
+const CHANGE_COPY = {
+  stable: {
+    tone: "verified",
+    label: "Same cause as last time",
+    body: "The driver behind this change is the one found previously. A "
+        + "repeated cause is worth more than a new one: it means the earlier "
+        + "answer held up on fresh data.",
+  },
+  replaced: {
+    tone: "association",
+    label: "The cause has changed",
+    body: "Something different is driving the metric now. Acting on the "
+        + "previous answer would address a problem that has already moved.",
+  },
+  disappeared: {
+    tone: "measurement",
+    label: "The previous cause is gone",
+    body: "What explained the change last time no longer does. Either it was "
+        + "fixed, or it was specific to that period.",
+  },
+  increased: {
+    tone: "alert",
+    label: "The same cause, now larger",
+    body: "The driver is unchanged but its share of the movement has grown.",
+  },
+};
+
+/**
+ * Proposal Sec.14 — comparison against the previous investigation.
+ *
+ * This was computed and stored from the start, and nothing ever read it back.
+ * Noticing that the cause has changed since last quarter is worth little if
+ * the system cannot say so.
+ */
+function DriverChange({ comparison }) {
+  const copy = CHANGE_COPY[comparison.driver_change] || {
+    tone: "neutral",
+    label: comparison.driver_change,
+    body: comparison.summary,
+  };
+  return (
+    <Panel>
+      <PanelHeader
+        title="Compared with the last investigation"
+        description={
+          comparison.previous_investigation
+            ? `Against "${comparison.previous_investigation.question}"`
+            : undefined
+        }
+        action={<Badge tone={copy.tone}>{copy.label}</Badge>}
+      />
+      <div className="px-5 py-4">
+        <p className="max-w-[70ch] text-[13.5px] leading-relaxed">{copy.body}</p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg px-3 py-2.5" style={{ background: "var(--surface-inset)" }}>
+            <div className="mb-1.5 flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+              <GitCompare size={12} />
+              Previously
+            </div>
+            {(comparison.previous_drivers || []).length ? (
+              comparison.previous_drivers.map((d, i) => (
+                <p key={i} className="text-[12.5px] leading-relaxed">{d}</p>
+              ))
+            ) : (
+              <p className="text-[12.5px] text-[var(--text-muted)]">No driver found</p>
+            )}
+          </div>
+          <div className="rounded-lg px-3 py-2.5" style={{ background: "var(--accent-quiet)" }}>
+            <div className="mb-1.5 text-[11.5px] font-medium uppercase tracking-wide text-[var(--accent)]">
+              Now
+            </div>
+            {(comparison.current_drivers || []).length ? (
+              comparison.current_drivers.map((d, i) => (
+                <p key={i} className="text-[12.5px] leading-relaxed">{d}</p>
+              ))
+            ) : (
+              <p className="text-[12.5px] text-[var(--text-muted)]">No driver found</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+/** A rendered chart, fetched with the session token rather than as a bare URL. */
+function ChartPanel({ chart }) {
+  const [src, setSrc] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let url;
+    api
+      .chartBlob(chart.id)
+      .then((u) => {
+        url = u;
+        setSrc(u);
+      })
+      .catch(() => setFailed(true));
+    // the object URL holds the image in memory until it is released
+    return () => url && URL.revokeObjectURL(url);
+  }, [chart.id]);
+
+  return (
+    <Panel className="overflow-hidden">
+      <PanelHeader
+        title={chart.title}
+        description="The same breakdown the finding above rests on"
+      />
+      {failed ? (
+        <p className="px-5 py-4 text-[13px] text-[var(--text-muted)]">
+          The chart image could not be loaded.
+        </p>
+      ) : src ? (
+        <img src={src} alt={chart.title} className="w-full" />
+      ) : (
+        <div className="p-5">
+          <Skeleton className="h-52 w-full" />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export default function InvestigationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,6 +159,7 @@ export default function InvestigationDetail() {
   const [state, setState] = useState(null);
   const [evidence, setEvidence] = useState(null);
   const [timeline, setTimeline] = useState(null);
+  const [comparison, setComparison] = useState(null);
   const [error, setError] = useState(null);
 
   const [answer, setAnswer] = useState("");
@@ -55,6 +181,7 @@ export default function InvestigationDetail() {
     // lives in the evidence payload, so it is fetched once up front rather
     // than only when the Evidence tab is opened.
     api.evidence(id).then(setEvidence).catch(() => {});
+    api.comparison(id).then(setComparison).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -266,6 +393,10 @@ export default function InvestigationDetail() {
               </Panel>
             )}
 
+            {(report.charts || []).map((c) => (
+              <ChartPanel key={c.id} chart={c} />
+            ))}
+
             {(report.forecasts || []).map((f) => (
               <ForecastChart key={f.id} forecast={f} />
             ))}
@@ -284,6 +415,38 @@ export default function InvestigationDetail() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {comparison?.available && <DriverChange comparison={comparison} />}
+
+            {(report.retrieval?.context_documents?.length > 0 ||
+              report.retrieval?.definitions_used?.length > 0) && (
+              <Panel>
+                <PanelHeader
+                  title="Background consulted"
+                  description="Read while planning this investigation, not only when writing it up"
+                />
+                <ul className="divide-y">
+                  {(report.retrieval.definitions_used || []).map((d, i) => (
+                    <li key={`d${i}`} className="flex items-center gap-3 px-5 py-3">
+                      <BookOpen size={15} className="shrink-0 text-[var(--text-muted)]" />
+                      <span className="min-w-0 flex-1 truncate text-[13.5px]">{d}</span>
+                      <Badge tone="neutral">definition</Badge>
+                    </li>
+                  ))}
+                  {(report.retrieval.context_documents || []).map((d, i) => (
+                    <li key={`c${i}`} className="flex items-center gap-3 px-5 py-3">
+                      <BookOpen size={15} className="shrink-0 text-[var(--text-muted)]" />
+                      <span className="min-w-0 flex-1 truncate text-[13.5px]">{d}</span>
+                      <Badge tone="neutral">context</Badge>
+                    </li>
+                  ))}
+                </ul>
+                <p className="border-t px-5 py-3 text-[12.5px] leading-relaxed text-[var(--text-muted)]">
+                  The table shows where the change sits. These documents are where
+                  an explanation for it can come from — neither is enough alone.
+                </p>
+              </Panel>
             )}
 
             {report.critique?.concerns?.length > 0 && (

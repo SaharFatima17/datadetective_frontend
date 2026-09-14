@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   BookOpen,
   Database,
+  MessageSquare,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -14,6 +15,7 @@ import {
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/sources", label: "Sources", icon: Database },
   { to: "/investigations", label: "Investigations", icon: Search },
   { to: "/reports", label: "Reports", icon: FileText },

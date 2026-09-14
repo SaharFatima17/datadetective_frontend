@@ -270,6 +270,28 @@ export default function ReportDocument({ report, state, calculations = {} }) {
         </section>
       )}
 
+      {/* --------------------------- what was read ---------------------------- */}
+      {(report.retrieval?.context_documents?.length > 0 ||
+        report.retrieval?.definitions_used?.length > 0) && (
+        <section className="mt-7">
+          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Background consulted
+          </h3>
+          <ul className="mt-2 space-y-1.5">
+            {[...(report.retrieval.definitions_used || []),
+              ...(report.retrieval.context_documents || [])].map((d, i) => (
+              <li key={i} className="max-w-[68ch] text-[13px] leading-relaxed">
+                {d}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 max-w-[68ch] text-[12px] leading-relaxed text-[var(--text-muted)]">
+            Consulted while planning, not only when writing up. A reader can check
+            what shaped the question as well as what answered it.
+          </p>
+        </section>
+      )}
+
       {/* ---------------------------- limitations ----------------------------- */}
       {report.limitations?.length > 0 && (
         <section className="mt-8 border-t pt-5">

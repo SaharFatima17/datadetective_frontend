@@ -1,18 +1,43 @@
 /**
  * API client for the DataDetective backend.
  *
- * The token lives in memory only. Storing a JWT in localStorage would let any
- * injected script read it; keeping it here means a refresh signs the user out,
- * which is the right trade for a tool that reads private business data.
+ * The token is held in sessionStorage, not localStorage. That is a deliberate
+ * middle position:
+ *
+ *   localStorage    survives everything, including a closed browser — the
+ *                   longest-lived target for an injected script
+ *   memory only     safest, but a refresh drops you out mid-conversation,
+ *                   which makes a chat thread feel lost even though the
+ *                   server still has it
+ *   sessionStorage  survives a refresh, and dies with the tab
+ *
+ * A conversation is the one thing a person expects to still be there after a
+ * reload, so the session has to outlive the page. It still ends when the tab
+ * closes, and the server validates the token on every request regardless.
  */
 
-const BASE = import.meta.env.VITE_API_URL || "";
+const BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
-let token = null;
+// In development the Vite proxy forwards /api to localhost:8000, so an empty
+// BASE is correct. In a production build there is no proxy: an empty BASE means
+// every request goes to the site hosting the frontend, which has no API. Say so
+// at build time rather than leaving someone to debug 404s.
+if (import.meta.env.PROD && !BASE) {
+  console.error(
+    "VITE_API_URL is not set. This build will send API requests to itself and " +
+      "every one of them will fail. Set VITE_API_URL to the deployed backend " +
+      "address and redeploy.",
+  );
+}
+const STORAGE_KEY = "dd-session";
+
+let token = sessionStorage.getItem(STORAGE_KEY) || null;
 let onUnauthorized = () => {};
 
 export function setToken(value) {
   token = value;
+  if (value) sessionStorage.setItem(STORAGE_KEY, value);
+  else sessionStorage.removeItem(STORAGE_KEY);
 }
 
 export function getToken() {
@@ -52,7 +77,7 @@ async function request(path, { method = "GET", body, form, signal } = {}) {
   }
 
   if (response.status === 401) {
-    token = null;
+    setToken(null);
     onUnauthorized();
     throw new ApiError("Your session ended. Sign in again.", 401);
   }
@@ -121,7 +146,19 @@ export const api = {
     request(`/api/datasets/${id}/query-sql`, { method: "POST", body: { query } }),
   chart: (id, spec) =>
     request(`/api/datasets/${id}/chart`, { method: "POST", body: { spec } }),
-  chartUrl: (chartId) => `${BASE}/api/charts/${chartId}`,
+  /**
+   * Charts are behind the same authentication as everything else, and an
+   * <img src> cannot carry a bearer token. Fetching the bytes and handing back
+   * an object URL keeps the endpoint protected rather than opening it up for
+   * the sake of one tag.
+   */
+  chartBlob: async (chartId) => {
+    const response = await fetch(`${BASE}/api/charts/${chartId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new ApiError("Chart could not be loaded", response.status);
+    return URL.createObjectURL(await response.blob());
+  },
   forecast: (id, payload) =>
     request(`/api/datasets/${id}/forecast`, { method: "POST", body: payload }),
 
@@ -146,6 +183,7 @@ export const api = {
   abandon: (id) =>
     request(`/api/investigations/${id}/abandon`, { method: "POST" }),
   report: (id) => request(`/api/investigations/${id}/report`),
+  comparison: (id) => request(`/api/investigations/${id}/comparison`),
   timeline: (id) => request(`/api/investigations/${id}/timeline`),
   evidence: (id) => request(`/api/investigations/${id}/evidence`),
   recommendations: (id) => request(`/api/investigations/${id}/recommendations`),
@@ -156,8 +194,27 @@ export const api = {
       { method: "POST", body: { rating, notes } },
     ),
 
+  // --- chat -------------------------------------------------------- //
+  conversations: () => request("/api/chat/conversations"),
+  conversation: (id) => request(`/api/chat/conversations/${id}`),
+  newConversation: (payload = {}) =>
+    request("/api/chat/conversations", { method: "POST", body: payload }),
+  sendMessage: (id, content) =>
+    request(`/api/chat/conversations/${id}/messages`, {
+      method: "POST",
+      body: { content },
+    }),
+  chatUpload: (id, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request(`/api/chat/conversations/${id}/upload`, { method: "POST", form });
+  },
+  archiveConversation: (id) =>
+    request(`/api/chat/conversations/${id}`, { method: "DELETE" }),
+
   // --- knowledge --------------------------------------------------- //
   documents: () => request("/api/documents"),
+  deleteDocument: (id) => request(`/api/documents/${id}`, { method: "DELETE" }),
   indexDocument: (payload) =>
     request("/api/documents", { method: "POST", body: payload }),
   search: (query, documentType) =>

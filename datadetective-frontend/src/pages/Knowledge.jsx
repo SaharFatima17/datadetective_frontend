@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { BookOpen, Search as SearchIcon } from "lucide-react";
+
+import { BookOpen, Check, Search as SearchIcon, Trash2, X } from "lucide-react";
 import { api } from "../api";
 import Dropzone from "../components/Dropzone";
 import {
@@ -29,13 +30,105 @@ const TYPE_LABEL = {
   web_page: "web page",
 };
 
+/**
+ * One indexed document, with a way to take it back out.
+ *
+ * A page fetched by mistake otherwise stays in the agents' retrieval set for
+ * every future investigation. Confirming inline rather than in a modal keeps
+ * the question next to the item it refers to — the list can hold several
+ * similarly named reports.
+ */
+function DocumentRow({ doc, onDelete, typeLabel }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  if (confirming) {
+    return (
+      <li
+        className="px-5 py-3"
+        style={{ background: "color-mix(in srgb, var(--color-alert-soft) 8%, transparent)" }}
+      >
+        <p className="text-[13px]">Remove this from what the agents can retrieve?</p>
+        <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+          The stored snapshot stays under Sources — only the indexed text is removed.
+        </p>
+        <div className="mt-2 flex gap-1.5">
+          <button
+            onClick={async () => {
+              setBusy(true);
+              await onDelete();
+            }}
+            disabled={busy}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px]
+              font-medium text-white disabled:opacity-50"
+            style={{ background: "var(--color-alert-soft)" }}
+          >
+            <Check size={12} />
+            Remove
+          </button>
+          <button
+            onClick={() => setConfirming(false)}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px]
+              font-medium transition-colors hover:bg-[var(--surface-sunken)]"
+          >
+            <X size={12} />
+            Keep
+          </button>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="group flex items-center gap-3 px-5 py-3">
+      <BookOpen size={15} className="shrink-0 text-[var(--text-muted)]" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium">{doc.title}</p>
+        <p className="font-mono text-[11.5px] text-[var(--text-muted)]">
+          {doc.chunks} chunks
+        </p>
+      </div>
+      <Badge tone={doc.type === "past_report" ? "verified" : "neutral"}>
+        {typeLabel}
+      </Badge>
+      <button
+        onClick={() => setConfirming(true)}
+        aria-label={`Remove ${doc.title}`}
+        title="Remove from retrieval"
+        className="rounded-md p-1.5 text-[var(--text-muted)] opacity-0 transition-opacity
+          hover:text-[var(--color-alert-soft)] focus-visible:opacity-100
+          group-hover:opacity-100"
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
+  );
+}
+
+/* A half-written definition must survive leaving the page.
+ *
+ * This page offers a link to Sources for uploading a file, and taking it
+ * unmounts the form. Losing typed work because the interface suggested going
+ * somewhere else is the interface's fault, not the person's. The draft is kept
+ * per-tab and cleared the moment it is saved. */
+const DRAFT_KEY = "dd-kb-draft";
+
+function loadDraft() {
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
 export default function Knowledge() {
   const [documents, setDocuments] = useState(null);
   const [error, setError] = useState(null);
 
-  const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
-  const [type, setType] = useState("business_doc");
+  const draft = loadDraft();
+  const [title, setTitle] = useState(draft.title || "");
+  const [text, setText] = useState(draft.text || "");
+  const [type, setType] = useState(draft.type || "business_doc");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -57,17 +150,38 @@ export default function Knowledge() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (title || text) {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title, text, type }));
+    } else {
+      sessionStorage.removeItem(DRAFT_KEY);
+    }
+  }, [title, text, type]);
+
   async function save() {
     setSaving(true);
     try {
       await api.indexDocument({ title, text, document_type: type });
       setTitle("");
       setText("");
+      sessionStorage.removeItem(DRAFT_KEY);
       await load();
     } catch (err) {
       setError(err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove(id) {
+    try {
+      await api.deleteDocument(id);
+      await load();
+      // A result list that still shows the removed document is worse than a
+      // cleared one: it suggests the removal did not take.
+      setResults(null);
+    } catch (err) {
+      setError(err);
     }
   }
 
@@ -153,15 +267,21 @@ export default function Knowledge() {
         <Panel>
           <PanelHeader
             title="Add context"
-            description="Paste a definition, or drop a PDF or Word file"
+            description="Drop a document, or write a definition that only exists in someone's head"
           />
           <div className="space-y-4 p-5">
+            {/* Documents can also be added from Sources, which handles every
+                kind of input. Keeping it here too is deliberate: someone adding
+                business context is already on this page, and sending them to
+                another one to finish the job — losing what they had typed —
+                was worse than having two ways in. */}
             <Dropzone
               compact
               accept="documents"
               busy={uploading}
               onFile={async (file) => {
                 setUploading(true);
+                setError(null);
                 try {
                   await api.upload(file);
                   await load();
@@ -238,18 +358,12 @@ export default function Knowledge() {
           ) : documents.length ? (
             <ul className="divide-y">
               {documents.map((d) => (
-                <li key={d.id} className="flex items-center gap-3 px-5 py-3">
-                  <BookOpen size={15} className="shrink-0 text-[var(--text-muted)]" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium">{d.title}</p>
-                    <p className="font-mono text-[11.5px] text-[var(--text-muted)]">
-                      {d.chunks} chunks
-                    </p>
-                  </div>
-                  <Badge tone={d.type === "past_report" ? "verified" : "neutral"}>
-                    {TYPE_LABEL[d.type] || d.type}
-                  </Badge>
-                </li>
+                <DocumentRow
+                  key={d.id}
+                  doc={d}
+                  typeLabel={TYPE_LABEL[d.type] || d.type}
+                  onDelete={() => remove(d.id)}
+                />
               ))}
             </ul>
           ) : (
