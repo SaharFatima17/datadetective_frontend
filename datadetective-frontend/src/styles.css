@@ -281,6 +281,14 @@ body {
     break-after: avoid;
   }
 
+  /* A chart split across two sheets is unreadable, and one scaled past the
+     page width is cropped by the printer. */
+  figure,
+  img {
+    break-inside: avoid;
+    max-width: 100% !important;
+  }
+
   a[href]::after {
     content: "";
   }

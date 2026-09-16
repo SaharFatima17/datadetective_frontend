@@ -197,6 +197,13 @@ export const api = {
   // --- chat -------------------------------------------------------- //
   conversations: () => request("/api/chat/conversations"),
   conversation: (id) => request(`/api/chat/conversations/${id}`),
+  // Opens a thread already attached to a finished investigation, for someone
+  // who was handed the report rather than running it.
+  chatAboutInvestigation: (investigationId) =>
+    request("/api/chat/conversations", {
+      method: "POST",
+      body: { investigation_id: investigationId },
+    }),
   newConversation: (payload = {}) =>
     request("/api/chat/conversations", { method: "POST", body: payload }),
   sendMessage: (id, content) =>

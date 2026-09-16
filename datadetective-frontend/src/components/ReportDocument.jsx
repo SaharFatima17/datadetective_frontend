@@ -1,4 +1,6 @@
-import { Panel } from "./ui";
+import { useEffect, useState } from "react";
+import { api } from "../api";
+import { Panel, Skeleton } from "./ui";
 
 const num = (n, digits = 0) =>
   n == null
@@ -19,6 +21,51 @@ const TYPE_COLOUR = {
   association: "var(--color-amber-soft)",
   measurement: "var(--border-strong)",
 };
+
+/**
+ * A chart inside the printed report.
+ *
+ * Charts sit behind the same authentication as everything else, so the image is
+ * fetched with the session token and handed to the tag as an object URL. It is
+ * also drawn at print time: a reader checks "the fall is concentrated in one
+ * group" far faster from a picture than from a paragraph, and the report is the
+ * artefact that leaves the application.
+ */
+function ReportChart({ chart }) {
+  const [src, setSrc] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let url;
+    api
+      .chartBlob(chart.id)
+      .then((u) => {
+        url = u;
+        setSrc(u);
+      })
+      .catch(() => setFailed(true));
+    return () => url && URL.revokeObjectURL(url);
+  }, [chart.id]);
+
+  if (failed) return null;          // a missing picture must not break the report
+
+  return (
+    <figure className="mt-3">
+      {src ? (
+        <img
+          src={src}
+          alt={chart.title}
+          className="w-full max-w-2xl rounded-lg border"
+        />
+      ) : (
+        <Skeleton className="h-52 w-full max-w-2xl" />
+      )}
+      <figcaption className="mt-1.5 text-[12px] text-[var(--text-muted)]">
+        {chart.title} — the breakdown the finding above rests on.
+      </figcaption>
+    </figure>
+  );
+}
 
 /**
  * The report is a deliverable someone else reads, often on paper. It has to
@@ -141,6 +188,16 @@ export default function ReportDocument({ report, state, calculations = {} }) {
           </p>
         </section>
       )}
+
+      {/* -------------------------------- chart -------------------------------- */}
+      {(report.charts || []).map((c) => (
+        <section key={c.id} className="mt-7">
+          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            {c.title}
+          </h3>
+          <ReportChart chart={c} />
+        </section>
+      ))}
 
       {/* ------------------------------ findings ------------------------------ */}
       {findings.length > 0 && (

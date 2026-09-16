@@ -317,6 +317,7 @@ export default function Chat() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [unavailable, setUnavailable] = useState(null);
 
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
@@ -342,10 +343,27 @@ export default function Chat() {
   useEffect(() => {
     if (!id) {
       setThread(null);
+      setUnavailable(null);
+      setError(null);
       return;
     }
     setThread(null);
-    api.conversation(id).then(setThread).catch(setError);
+    // Clearing these matters: an error left over from the previous thread used
+    // to stay on screen after opening a different one, so a conversation that
+    // had loaded perfectly well still showed "belongs to another user".
+    setUnavailable(null);
+    setError(null);
+    api
+      .conversation(id)
+      .then(setThread)
+      .catch((err) =>
+        // A link to someone else's thread, or one that has been deleted, is a
+        // dead end rather than a failure to report — offer a way forward
+        // instead of an error with a live composer underneath it.
+        err.status === 403 || err.status === 404
+          ? setUnavailable(err.status)
+          : setError(err),
+      );
   }, [id]);
 
   useEffect(() => {
@@ -482,7 +500,27 @@ export default function Chat() {
           upload(e.dataTransfer.files?.[0]);
         }}
       >
-        {!id ? (
+        {unavailable ? (
+          <EmptyState
+            icon={MessageSquare}
+            title={
+              unavailable === 403
+                ? "This conversation isn't yours"
+                : "This conversation no longer exists"
+            }
+            body={
+              unavailable === 403
+                ? "It belongs to another account. Your own conversations are listed on the left."
+                : "It may have been deleted. Your own conversations are listed on the left."
+            }
+            action={
+              <Button variant="primary" onClick={startThread}>
+                <Plus size={15} />
+                Start a conversation
+              </Button>
+            }
+          />
+        ) : !id ? (
           <EmptyState
             icon={MessageSquare}
             title="Ask in your own words"

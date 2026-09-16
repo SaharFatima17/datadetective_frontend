@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, GitCompare, HelpCircle, Lightbulb, Upload } from "lucide-react";
+import { ArrowLeft, BookOpen, GitCompare, HelpCircle, Lightbulb, MessageSquare, Upload } from "lucide-react";
 import { api } from "../api";
 import ForecastChart from "../components/ForecastChart";
 import RecommendationCard from "../components/RecommendationCard";
@@ -165,6 +165,21 @@ export default function InvestigationDetail() {
   const [answer, setAnswer] = useState("");
   const [resuming, setResuming] = useState(false);
   const [resumeError, setResumeError] = useState(null);
+  const [openingChat, setOpeningChat] = useState(false);
+
+  /* Hands the reader a conversation about this investigation, rather than an
+     empty one they would have to re-attach data to. */
+  async function openChat() {
+    setOpeningChat(true);
+    try {
+      const created = await api.chatAboutInvestigation(id);
+      navigate(`/chat/${created.id}`);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setOpeningChat(false);
+    }
+  }
 
   async function load() {
     setError(null);
@@ -270,9 +285,17 @@ export default function InvestigationDetail() {
             {state.target_metric || "no metric identified"} · round {state.round}
           </p>
         </div>
-        <Badge tone={state.status === "complete" ? "verified" : "association"}>
-          {state.status.replace(/_/g, " ")}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {state.status === "complete" && (
+            <Button size="sm" busy={openingChat} onClick={openChat}>
+              <MessageSquare size={14} />
+              Ask about this
+            </Button>
+          )}
+          <Badge tone={state.status === "complete" ? "verified" : "association"}>
+            {state.status.replace(/_/g, " ")}
+          </Badge>
+        </div>
       </div>
 
       {/* ------------- the pause: the system asks, rather than guessing ------------- */}

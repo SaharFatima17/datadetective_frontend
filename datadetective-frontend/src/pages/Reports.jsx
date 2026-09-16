@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, FileText } from "lucide-react";
+import { BookOpen, FileText, MessageSquare } from "lucide-react";
 import { api } from "../api";
 import {
   Badge,
@@ -128,9 +128,26 @@ export default function Reports() {
                       );
                     })()}
                   </div>
-                  <Button size="sm" onClick={() => navigate(`/investigations/${inv.id}`)}>
-                    Open
-                  </Button>
+                  <div className="flex shrink-0 flex-col gap-2">
+                    <Button size="sm" onClick={() => navigate(`/investigations/${inv.id}`)}>
+                      Open
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          const c = await api.chatAboutInvestigation(inv.id);
+                          navigate(`/chat/${c.id}`);
+                        } catch (err) {
+                          setError(err);
+                        }
+                      }}
+                    >
+                      <MessageSquare size={13} />
+                      Ask
+                    </Button>
+                  </div>
                 </div>
               </li>
             ))}
@@ -151,5 +168,3 @@ export default function Reports() {
     </div>
   );
 }
-
-
