@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   BookOpen,
+  FileSearch,
   Database,
   MessageSquare,
   FileText,
@@ -19,26 +20,15 @@ const NAV = [
   { to: "/sources", label: "Sources", icon: Database },
   { to: "/investigations", label: "Investigations", icon: Search },
   { to: "/reports", label: "Reports", icon: FileText },
+  { to: "/briefs", label: "Briefs", icon: FileSearch },
   { to: "/knowledge", label: "Knowledge base", icon: BookOpen },
 ];
 
 function Mark() {
   return (
     <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
-      <circle
-        cx="14"
-        cy="14"
-        r="7"
-        fill="none"
-        stroke="var(--accent)"
-        strokeWidth="2.5"
-      />
-      <path
-        d="M19 19 L26 26"
-        stroke="var(--accent)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
+      <circle cx="14" cy="14" r="7" fill="none" stroke="var(--accent)" strokeWidth="2.5" />
+      <path d="M19 19 L26 26" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" />
       <circle cx="14" cy="14" r="2" fill="var(--accent)" />
     </svg>
   );
@@ -58,15 +48,16 @@ export function Sidebar({ open, onClose, user, onSignOut, provider }) {
         className={`no-print fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r
           transition-transform duration-200 lg:translate-x-0
           ${open ? "translate-x-0" : "-translate-x-full"}`}
-        style={{ background: "var(--surface-raised)" }}
+        style={{ background: "var(--surface-raised)", boxShadow: "var(--shadow-lg)" }}
       >
         <div className="flex h-14 items-center gap-2.5 px-5">
           <Mark />
           <span className="text-[15px] font-semibold tracking-tight">
-            DataDetective
+            <span className="text-[var(--text-primary)]">Data</span>
+            <span className="text-[var(--accent)]">Detective</span>
           </span>
           <button
-            className="ml-auto rounded-md p-1 lg:hidden"
+            className="ml-auto rounded-md p-1 hover:bg-[var(--surface-sunken)] lg:hidden"
             onClick={onClose}
             aria-label="Close navigation"
           >
@@ -82,16 +73,32 @@ export function Sidebar({ open, onClose, user, onSignOut, provider }) {
               end={end}
               onClick={onClose}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-medium
-                 transition-colors ${
+                `group relative flex items-center gap-3 rounded-lg px-3 py-2 pl-4 text-[13.5px] font-medium
+                 transition-colors duration-150 ${
                    isActive
                      ? "bg-[var(--accent-quiet)] text-[var(--accent)]"
-                     : "text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)]"
+                     : "text-[var(--text-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--text-primary)]"
                  }`
               }
             >
-              <Icon size={16.5} />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full
+                      transition-[opacity,transform] duration-200"
+                    style={{
+                      background: "var(--accent)",
+                      opacity: isActive ? 1 : 0,
+                      transform: `translateY(-50%) scaleY(${isActive ? 1 : 0.4})`,
+                    }}
+                  />
+                  <Icon
+                    size={16.5}
+                    className={`transition-transform duration-150 ${isActive ? "" : "group-hover:translate-x-0.5"}`}
+                  />
+                  <span className={`underline-hover ${isActive ? "is-active" : ""}`}>{label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -113,7 +120,7 @@ export function Sidebar({ open, onClose, user, onSignOut, provider }) {
             onClick={onSignOut}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13.5px]
               font-medium text-[var(--text-secondary)] transition-colors
-              hover:bg-[var(--surface-sunken)]"
+              hover:bg-[var(--surface-sunken)] hover:text-[var(--color-alert-soft)]"
           >
             <LogOut size={16.5} />
             Sign out
@@ -129,7 +136,10 @@ export function TopBar({ title, subtitle, onMenu, theme, onToggleTheme, actions 
     <header
       className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b px-4 backdrop-blur
         lg:px-7"
-      style={{ background: "color-mix(in srgb, var(--surface-page) 85%, transparent)" }}
+      style={{
+        background: "color-mix(in srgb, var(--surface-page) 85%, transparent)",
+        boxShadow: "0 1px 0 var(--border-hairline), 0 8px 20px -18px rgba(0,0,0,0.4)",
+      }}
     >
       <button
         className="rounded-md p-1.5 hover:bg-[var(--surface-sunken)] lg:hidden"

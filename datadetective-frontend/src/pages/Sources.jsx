@@ -6,6 +6,8 @@ import Dropzone from "../components/Dropzone";
 import {
   Badge,
   Button,
+  CheckRow,
+  DeleteButton,
   EmptyState,
   ErrorState,
   Field,
@@ -48,6 +50,8 @@ export default function Sources() {
   const [query, setQuery] = useState("SELECT * FROM ");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
+  const [crawl, setCrawl] = useState(true);
+  const [pages, setPages] = useState(15);
 
   async function load() {
     setError(null);
@@ -181,28 +185,73 @@ export default function Sources() {
           {tab === "url" && (
             <div className="max-w-xl space-y-4">
               <Field
-                label="Page address"
-                hint="a snapshot is kept, so the finding stays traceable if the page changes"
+                label="Address"
+                hint="a snapshot is kept, so a finding stays traceable if the page changes"
               >
                 <Input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com/quarterly-summary"
+                  placeholder="https://example.com"
                 />
               </Field>
+
+              {/* One page is rarely what someone means by "the system should
+                  know about this company" — that information is spread across
+                  several pages and the documents linked from them. */}
+              <CheckRow checked={crawl} onChange={setCrawl}>
+                <span className="block text-[13.5px] font-medium">
+                  Follow links and index the whole site
+                </span>
+                <span className="mt-0.5 block text-[12.5px] text-[var(--text-muted)]">
+                  Stays on the same domain, and picks up linked PDFs and Word
+                  files. Leave this off to take just the one page.
+                </span>
+              </CheckRow>
+
+              {crawl && (
+                <Field label="Page limit" hint="stops when it reaches this many">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={25}
+                    value={pages}
+                    onChange={(e) => setPages(Number(e.target.value))}
+                    className="max-w-[120px]"
+                  />
+                </Field>
+              )}
+
               <Button
                 variant="primary"
                 busy={busy}
                 disabled={!url}
                 onClick={() =>
-                  run(
-                    () => api.ingestUrl({ url, index_for_rag: true }),
-                    (r) => `Retrieved and indexed in ${r.chunks} chunks.`,
-                  )
+                  crawl
+                    ? run(
+                        () => api.crawlSite({ url, max_pages: pages, max_depth: 2 }),
+                        (r) =>
+                          `${r.pages_indexed} page${r.pages_indexed === 1 ? "" : "s"}` +
+                          (r.documents_indexed
+                            ? ` and ${r.documents_indexed} document${r.documents_indexed === 1 ? "" : "s"}`
+                            : "") +
+                          ` indexed, ${r.total_chunks} passages.` +
+                          (r.failed?.length ? ` ${r.failed.length} address(es) could not be read.` : ""),
+                      )
+                    : run(
+                        () => api.ingestUrl({ url, index_for_rag: true }),
+                        (r) => `Retrieved and indexed in ${r.chunks} passages.`,
+                      )
                 }
               >
-                Retrieve page
+                {crawl ? "Crawl site" : "Retrieve page"}
               </Button>
+
+              {crawl && busy && (
+                <p className="text-[12.5px] text-[var(--text-muted)]">
+                  Fetching pages one at a time. A site of fifteen pages takes
+                  under a minute.
+                </p>
+              )}
             </div>
           )}
 
@@ -275,7 +324,7 @@ export default function Sources() {
           ) : sources.length ? (
             <ul className="divide-y">
               {sources.map((s) => (
-                <li key={s.id} className="flex items-center gap-3 px-5 py-3">
+                <li key={s.id} className="group flex items-center gap-3 px-5 py-3">
                   <HardDrive size={15} className="shrink-0 text-[var(--text-muted)]" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px]">{s.name}</p>
@@ -286,6 +335,21 @@ export default function Sources() {
                   <Badge tone={s.status === "extracted" ? "verified" : "neutral"}>
                     {s.status}
                   </Badge>
+                  <DeleteButton
+                    label={`Delete ${s.name}`}
+                    detail="Removes the snapshot and anything indexed from it"
+                    prompt="Delete this source?"
+                    onDelete={async () => {
+                      try {
+                        await api.deleteSource(s.id);
+                        await load();
+                      } catch (err) {
+                        // A source a dataset was built from is refused, with the
+                        // reason — shown rather than swallowed.
+                        setActionError(err);
+                      }
+                    }}
+                  />
                 </li>
               ))}
             </ul>

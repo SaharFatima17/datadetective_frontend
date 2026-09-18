@@ -110,9 +110,19 @@ export const api = {
   },
   ingestSql: (payload) =>
     request("/api/sources/sql", { method: "POST", body: payload }),
+  crawlSite: (payload) =>
+    request("/api/sources/crawl", { method: "POST", body: payload }),
+  composeBrief: (query, topK = 14) =>
+    request("/api/brief", { method: "POST", body: { query, top_k: topK } }),
+  briefs: () => request("/api/briefs"),
+  brief: (id) => request(`/api/briefs/${id}`),
+  deleteBrief: (id) => request(`/api/briefs/${id}`, { method: "DELETE" }),
+  askDocuments: (query, topK = 6) =>
+    request("/api/ask", { method: "POST", body: { query, top_k: topK } }),
   ingestUrl: (payload) =>
     request("/api/sources/url", { method: "POST", body: payload }),
   sources: () => request("/api/sources"),
+  deleteSource: (id) => request(`/api/sources/${id}`, { method: "DELETE" }),
 
   datasets: () => request("/api/datasets"),
   dataset: (id) => request(`/api/datasets/${id}`),
@@ -180,6 +190,8 @@ export const api = {
       form,
     });
   },
+  deleteInvestigation: (id) =>
+    request(`/api/investigations/${id}`, { method: "DELETE" }),
   abandon: (id) =>
     request(`/api/investigations/${id}/abandon`, { method: "POST" }),
   report: (id) => request(`/api/investigations/${id}/report`),

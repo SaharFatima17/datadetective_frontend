@@ -1,20 +1,104 @@
-import { AlertTriangle, Check, Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useRef } from "react";
+import { AlertTriangle, Check, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 /* ------------------------------------------------------------------ *
  * Shared primitives.
  *
- * Radius is deliberately not uniform: panels get 14px, controls 8px, and
- * inline chips 6px. Same-radius-everywhere is what makes a interface read
- * as a template rather than a hierarchy.
+ * Solid colours, thin borders, restrained shadows — no gradients or glow
+ * on the controls themselves; only the ambient page background carries any
+ * of that, and only barely. Radius is deliberately not uniform: panels get
+ * --radius-card, controls 8px, inline chips are fully rounded.
  * ------------------------------------------------------------------ */
 
-export function Panel({ children, className = "", as: Tag = "section", ...rest }) {
+/**
+ * Pointer-driven tilt + spotlight, shared by any card that opts in.
+ *
+ * Everything is written straight to CSS custom properties via the DOM node,
+ * not React state — a tilt effect that re-renders on every mousemove is the
+ * "excessive JavaScript" this is explicitly trying to avoid. rAF coalesces
+ * updates to one per frame. Reduced-motion and coarse-pointer (touch) users
+ * never get a listener attached in the first place.
+ */
+function useTiltSpotlight({ tilt = false, spotlight = false } = {}) {
+  const ref = useRef(null);
+  const frame = useRef(null);
+
+  const enabled =
+    (tilt || spotlight) &&
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(hover: hover) and (pointer: fine)").matches &&
+    !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  const onMove = useCallback(
+    (e) => {
+      if (!enabled || !ref.current) return;
+      const node = ref.current;
+      const rect = node.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (frame.current) cancelAnimationFrame(frame.current);
+      frame.current = requestAnimationFrame(() => {
+        if (spotlight) {
+          node.style.setProperty("--spot-x", `${x}px`);
+          node.style.setProperty("--spot-y", `${y}px`);
+        }
+        if (tilt) {
+          const px = x / rect.width - 0.5;
+          const py = y / rect.height - 0.5;
+          node.style.setProperty("--tilt-y", `${px * 4}deg`);
+          node.style.setProperty("--tilt-x", `${-py * 4}deg`);
+        }
+      });
+    },
+    [enabled, tilt, spotlight],
+  );
+
+  const onLeave = useCallback(() => {
+    if (!enabled || !ref.current) return;
+    if (tilt) {
+      ref.current.style.setProperty("--tilt-x", "0deg");
+      ref.current.style.setProperty("--tilt-y", "0deg");
+    }
+  }, [enabled, tilt]);
+
+  return enabled ? { ref, onPointerMove: onMove, onPointerLeave: onLeave } : { ref };
+}
+
+/**
+ * elevate: 0 keeps the original flat panel-hover behaviour (still the right
+ * choice for dense report content and tables). 1–3 opts into the layered
+ * depth system — 3 is reserved for the handful of cards that should read as
+ * the most important thing on the screen (hero, headline answer).
+ * tilt/spotlight only ever apply together with elevate ≥ 2, on desktop,
+ * and never when the user has asked for reduced motion.
+ */
+export function Panel({
+  children,
+  className = "",
+  hover = true,
+  elevate = 0,
+  tilt = false,
+  spotlight = false,
+  as: Tag = "section",
+  ...rest
+}) {
+  const { ref, onPointerMove, onPointerLeave } = useTiltSpotlight({ tilt, spotlight });
+  const depthClass = elevate ? `elevate-${elevate}` : hover ? "panel-hover" : "";
+
   return (
     <Tag
-      className={`rounded-[14px] border bg-[var(--surface-raised)] shadow-[var(--shadow-card)] ${className}`}
+      ref={ref}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+      className={`relative rounded-[var(--radius-card)] border bg-[var(--surface-raised)]
+        ${elevate ? "" : "shadow-[var(--shadow-card)]"} ${depthClass}
+        ${tilt && onPointerMove ? "tilt-card" : ""} ${spotlight ? "spotlight-host overflow-hidden" : ""}
+        ${className}`}
       style={{ borderColor: "var(--border-hairline)" }}
       {...rest}
     >
+      {spotlight && <span className="spotlight" aria-hidden="true" />}
       {children}
     </Tag>
   );
@@ -34,15 +118,28 @@ export function PanelHeader({ title, description, action }) {
   );
 }
 
+/* Buttons behave like physical keys: they sit slightly proud of the page,
+   lift a touch further on hover, and settle back down on press. The primary
+   and ai variants add a faint gradient and a matching glow so the "lift"
+   reads as light catching a raised surface, not just a colour change. */
 const buttonStyles = {
   primary:
-    "bg-[var(--accent)] text-white hover:brightness-110 disabled:opacity-40",
+    "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_100%,white_6%),var(--accent))] " +
+    "text-[var(--on-accent)] shadow-[0_1px_1px_rgba(0,0,0,0.08),0_6px_16px_-6px_color-mix(in_srgb,var(--accent)_55%,transparent)] " +
+    "hover:shadow-[0_1px_1px_rgba(0,0,0,0.1),0_10px_22px_-6px_color-mix(in_srgb,var(--accent)_65%,transparent)] " +
+    "hover:brightness-[1.04] disabled:opacity-40 disabled:shadow-none",
   secondary:
-    "border bg-[var(--surface-raised)] hover:bg-[var(--surface-sunken)] disabled:opacity-40",
+    "border bg-[var(--surface-raised)] shadow-[var(--shadow-sm)] hover:bg-[var(--surface-sunken)] hover:border-[var(--border-strong)] disabled:opacity-40 disabled:shadow-none",
   ghost: "hover:bg-[var(--surface-sunken)] disabled:opacity-40",
   danger:
     "border border-[var(--color-alert-soft)] text-[var(--color-alert-soft)] hover:bg-[var(--color-alert-soft)]/10",
+  ai: "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--brand)_100%,white_8%),var(--brand))] text-white " +
+    "shadow-[0_1px_1px_rgba(0,0,0,0.08),0_6px_16px_-6px_color-mix(in_srgb,var(--brand)_55%,transparent)] " +
+    "hover:shadow-[0_1px_1px_rgba(0,0,0,0.1),0_10px_22px_-6px_color-mix(in_srgb,var(--brand)_65%,transparent)] " +
+    "hover:brightness-[1.04] disabled:opacity-40 disabled:shadow-none",
 };
+
+const liftable = new Set(["primary", "secondary", "ai"]);
 
 export function Button({
   children,
@@ -59,8 +156,10 @@ export function Button({
   };
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium
-        transition-[background-color,filter,transform] duration-150 active:scale-[0.98]
+      className={`group inline-flex items-center justify-center gap-2 rounded-lg font-medium
+        transition-[background-color,filter,transform,box-shadow] duration-150
+        ${liftable.has(variant) ? "hover:-translate-y-px active:translate-y-px" : ""}
+        active:scale-[0.98] motion-reduce:transform-none motion-reduce:transition-none
         disabled:cursor-not-allowed ${sizes[size]} ${buttonStyles[variant]} ${className}`}
       disabled={busy || rest.disabled}
       {...rest}
@@ -71,35 +170,71 @@ export function Button({
   );
 }
 
-/* Badge tones map one-to-one onto meanings defined in styles.css. */
+/* Badge tones map one-to-one onto meanings defined in styles.css:
+   verified → success green, driver → key-insight cyan, association/
+   measurement/alert as before, plus "ai" for AI-related accents. Tints are
+   deliberately subtle, never a solid bright fill. */
 const badgeTones = {
-  verified: "bg-[var(--accent-quiet)] text-[var(--accent)]",
+  verified: "bg-[var(--success-quiet)] text-[var(--color-success)]",
   driver: "bg-[var(--accent-quiet)] text-[var(--accent)]",
-  association: "bg-amber-soft/15 text-[var(--color-amber-deep)] dark:text-[var(--color-amber-soft)]",
+  association: "text-[var(--color-amber-deep)] dark:text-[var(--color-amber-soft)]",
   measurement: "bg-[var(--surface-sunken)] text-[var(--text-secondary)]",
-  alert: "bg-[var(--color-alert-soft)]/12 text-[var(--color-alert-deep)] dark:text-[var(--color-alert-soft)]",
+  alert: "text-[var(--color-alert-deep)] dark:text-[var(--color-alert-soft)]",
   neutral: "bg-[var(--surface-sunken)] text-[var(--text-secondary)]",
+  ai: "bg-[var(--brand-quiet)] text-[var(--brand)]",
+};
+
+const badgeDot = {
+  verified: "var(--color-success)",
+  driver: "var(--accent)",
+  association: "var(--color-amber-soft)",
+  measurement: "var(--text-muted)",
+  alert: "var(--color-alert-soft)",
+  neutral: "var(--text-muted)",
+  ai: "var(--brand)",
 };
 
 export function Badge({ tone = "neutral", children, className = "" }) {
+  const overrideStyle =
+    tone === "association"
+      ? { background: "color-mix(in srgb, var(--color-amber-soft) 14%, transparent)" }
+      : tone === "alert"
+        ? { background: "color-mix(in srgb, var(--color-alert-soft) 12%, transparent)" }
+        : undefined;
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px]
-        font-medium ${badgeTones[tone] || badgeTones.neutral} ${className}`}
-      style={
-        tone === "association"
-          ? { background: "color-mix(in srgb, var(--color-amber-soft) 16%, transparent)" }
-          : undefined
-      }
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11.5px]
+        font-medium shadow-[0_1px_2px_rgba(0,0,0,0.04)]
+        ${badgeTones[tone] || badgeTones.neutral} ${className}`}
+      style={{ borderColor: "color-mix(in srgb, currentColor 22%, transparent)", ...overrideStyle }}
     >
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{
+          background: badgeDot[tone] || badgeDot.neutral,
+          boxShadow: `0 0 0 2.5px color-mix(in srgb, ${badgeDot[tone] || badgeDot.neutral} 20%, transparent)`,
+        }}
+      />
       {children}
     </span>
   );
 }
 
-export function Stat({ label, value, hint, tone }) {
+export function Stat({ label, value, hint, tone, icon: Icon }) {
   return (
     <div>
+      {Icon && (
+        <div
+          className="mb-3 grid h-9 w-9 place-items-center rounded-lg"
+          style={{
+            background: tone
+              ? `color-mix(in srgb, ${tone} 14%, transparent)`
+              : "var(--accent-quiet)",
+          }}
+        >
+          <Icon size={16} style={{ color: tone || "var(--accent)" }} />
+        </div>
+      )}
       <div
         className="font-mono text-[30px] font-semibold leading-none tracking-tight"
         style={tone ? { color: tone } : undefined}
@@ -118,7 +253,7 @@ export function Skeleton({ className = "" }) {
 
 export function LoadingPanel({ label = "Loading" }) {
   return (
-    <Panel className="p-5">
+    <Panel hover={false} className="p-5">
       <div className="flex items-center gap-2 text-[13px] text-[var(--text-muted)]">
         <Loader2 size={14} className="animate-spin" />
         {label}
@@ -138,10 +273,10 @@ export function EmptyState({ icon: Icon, title, body, action }) {
     <div className="flex flex-col items-center px-6 py-14 text-center">
       {Icon && (
         <div
-          className="mb-4 grid h-12 w-12 place-items-center rounded-xl border"
-          style={{ background: "var(--surface-inset)" }}
+          className="mb-4 grid h-12 w-12 place-items-center rounded-xl"
+          style={{ background: "var(--accent-quiet)" }}
         >
-          <Icon size={20} className="text-[var(--text-muted)]" />
+          <Icon size={20} className="text-[var(--accent)]" />
         </div>
       )}
       <h3 className="text-[15px] font-semibold">{title}</h3>
@@ -161,7 +296,7 @@ export function ErrorState({ error, onRetry }) {
     typeof error === "string" ? error : error?.message || "Something failed.";
   return (
     <div
-      className="flex items-start gap-3 rounded-[14px] border p-4"
+      className="flex items-start gap-3 rounded-[var(--radius-card)] border p-4"
       style={{
         borderColor: "color-mix(in srgb, var(--color-alert-soft) 40%, transparent)",
         background: "color-mix(in srgb, var(--color-alert-soft) 7%, transparent)",
@@ -195,8 +330,9 @@ export function Input({ className = "", ...rest }) {
   return (
     <input
       className={`h-9 w-full rounded-lg border bg-[var(--surface-inset)] px-3 text-sm
-        outline-none transition-colors placeholder:text-[var(--text-muted)]
-        focus:border-[var(--accent)] ${className}`}
+        outline-none transition-[border-color,box-shadow] placeholder:text-[var(--text-muted)]
+        hover:border-[var(--border-strong)]
+        focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_16%,transparent)] ${className}`}
       {...rest}
     />
   );
@@ -206,8 +342,9 @@ export function Textarea({ className = "", ...rest }) {
   return (
     <textarea
       className={`w-full rounded-lg border bg-[var(--surface-inset)] px-3 py-2 text-sm
-        outline-none transition-colors placeholder:text-[var(--text-muted)]
-        focus:border-[var(--accent)] ${className}`}
+        outline-none transition-[border-color,box-shadow] placeholder:text-[var(--text-muted)]
+        hover:border-[var(--border-strong)]
+        focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_16%,transparent)] ${className}`}
       {...rest}
     />
   );
@@ -243,6 +380,29 @@ export function Toggle({ checked, onChange, label }) {
   );
 }
 
+/* Small icon-only destructive action — a table/list row's delete control.
+   Stays neutral until hovered, then turns to the alert hue, so a row of
+   these never reads as a wall of red. */
+export function DeleteButton({ onClick, busy = false, title = "Delete", className = "", ...rest }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy || rest.disabled}
+      title={title}
+      aria-label={title}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border
+        border-transparent text-[var(--text-muted)] transition-colors duration-150
+        hover:border-[var(--color-alert-soft)] hover:bg-[var(--color-alert-soft)]/10
+        hover:text-[var(--color-alert-soft)] disabled:cursor-not-allowed disabled:opacity-40
+        ${className}`}
+      {...rest}
+    >
+      {busy ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+    </button>
+  );
+}
+
 export function CheckRow({ checked, onChange, children }) {
   return (
     <button
@@ -257,7 +417,7 @@ export function CheckRow({ checked, onChange, children }) {
           borderColor: checked ? "var(--accent)" : "var(--border-strong)",
         }}
       >
-        {checked && <Check size={11} className="text-white" strokeWidth={3} />}
+        {checked && <Check size={11} className="text-[var(--on-accent)]" strokeWidth={3} />}
       </span>
       <span className="min-w-0 flex-1">{children}</span>
     </button>

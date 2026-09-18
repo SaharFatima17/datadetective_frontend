@@ -141,7 +141,14 @@ function ChartPanel({ chart }) {
           The chart image could not be loaded.
         </p>
       ) : src ? (
-        <img src={src} alt={chart.title} className="w-full" />
+        <div className="p-4">
+          <div
+            className="rounded-lg border p-3"
+            style={{ background: "#ffffff", borderColor: "var(--border-hairline)" }}
+          >
+            <img src={src} alt={chart.title} className="w-full" />
+          </div>
+        </div>
       ) : (
         <div className="p-5">
           <Skeleton className="h-52 w-full" />
@@ -502,7 +509,12 @@ export default function InvestigationDetail() {
         {/* --------------------------- Report --------------------------- */}
         {tab === "Report" && (
           <>
-            <ReportDocument report={report} state={state} calculations={calculations} />
+            <ReportDocument
+              report={report}
+              state={state}
+              calculations={calculations}
+              comparison={comparison}
+            />
             <div className="no-print flex gap-2">
               <Button onClick={() => window.print()}>Print or save as PDF</Button>
             </div>

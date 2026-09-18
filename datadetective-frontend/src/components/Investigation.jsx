@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { api } from "../api";
-import { Badge, Button, Code, EmptyState, Panel, PanelHeader } from "./ui";
+import { Badge, Button, Code, EmptyState, Panel, PanelHeader } from "../components/ui";
 
 const AGENT_LABEL = {
   profiler: "Profiler",
@@ -29,13 +29,6 @@ const HYPOTHESIS_TONE = {
   proposed: "neutral",
 };
 
-/**
- * Proposal Sec.17: "show hypotheses, agent actions and completed tests".
- *
- * Hypotheses come first because they are the reasoning; the tool runs beneath
- * are the work done to settle them. Listing the tool calls alone would show
- * activity without showing thought.
- */
 export function Timeline({ timeline, loading }) {
   const [openRun, setOpenRun] = useState(null);
 
@@ -143,11 +136,6 @@ export function Timeline({ timeline, loading }) {
   );
 }
 
-/**
- * Proposal Sec.17/Sec.18: every finding sits directly above the calculation
- * that produced it. The thread line is not decoration — it is the argument the
- * whole product makes, drawn.
- */
 export function EvidencePanel({ evidence, loading }) {
   const [expanded, setExpanded] = useState(null);
   const [verifying, setVerifying] = useState(null);

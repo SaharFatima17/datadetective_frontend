@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import { api } from "../api";
-import { Badge, Button, Code } from "./ui";
+import { Badge, Button, Code, Panel } from "./ui";
 
 const money = (n) =>
   n == null
@@ -36,14 +36,18 @@ export default function RecommendationCard({ rec, investigationId, rank }) {
   }
 
   return (
-    <article
-      className="rounded-[14px] border p-5 shadow-[var(--shadow-card)]"
-      style={{ background: "var(--surface-raised)" }}
-    >
+    <Panel as="article" elevate={2} spotlight className="group relative overflow-hidden p-5 pl-6">
+      {/* accent edge — dim until the card is worth a second look */}
+      <span
+        className="absolute inset-y-0 left-0 w-[3px] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        style={{ background: "var(--accent)" }}
+        aria-hidden="true"
+      />
       <div className="flex items-start gap-3">
         <span
           className="grid h-6 w-6 shrink-0 place-items-center rounded-md font-mono text-[12px]
-            font-semibold"
+            font-semibold transition-colors duration-200 group-hover:bg-[var(--accent)]
+            group-hover:text-[var(--on-accent)]"
           style={{ background: "var(--accent-quiet)", color: "var(--accent)" }}
         >
           {rank ?? rec.rank}
@@ -121,6 +125,6 @@ export default function RecommendationCard({ rec, investigationId, rank }) {
           </span>
         )}
       </div>
-    </article>
+    </Panel>
   );
 }

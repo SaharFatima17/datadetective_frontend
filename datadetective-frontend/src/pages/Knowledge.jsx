@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { BookOpen, Check, Search as SearchIcon, Trash2, X } from "lucide-react";
+import { BookOpen, Check, FileText, Printer, Search as SearchIcon, Trash2, X } from "lucide-react";
 import { api } from "../api";
+import BriefDocument from "../components/BriefDocument";
 import Dropzone from "../components/Dropzone";
 import {
   Badge,
@@ -122,6 +124,7 @@ function loadDraft() {
 }
 
 export default function Knowledge() {
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState(null);
   const [error, setError] = useState(null);
 
@@ -134,6 +137,9 @@ export default function Knowledge() {
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
+  const [answer, setAnswer] = useState(null);
+  const [brief, setBrief] = useState(null);
+  const [briefing, setBriefing] = useState(false);
   const [searching, setSearching] = useState(false);
 
   async function load() {
@@ -189,9 +195,15 @@ export default function Knowledge() {
     event.preventDefault();
     if (!query.trim()) return;
     setSearching(true);
+    setAnswer(null);
+    setBrief(null);
     try {
-      const result = await api.search(query.trim());
-      setResults(result.results);
+      // Ask rather than search: someone typing a question wants an answer, and
+      // the passages behind it are the evidence for that answer rather than the
+      // answer itself.
+      const result = await api.askDocuments(query.trim());
+      setAnswer(result);
+      setResults(result.sources || []);
     } catch (err) {
       setError(err);
     } finally {
@@ -201,6 +213,11 @@ export default function Knowledge() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 lg:px-7">
+      {/* While a brief is open the rest of this page is workspace, not
+          document — hidden from print so the sheet is the brief alone. */}
+      {brief && (
+        <style>{`@media print { .kb-chrome { display: none !important; } }`}</style>
+      )}
       {error && (
         <div className="mb-4">
           <ErrorState error={error} onRetry={load} />
@@ -208,10 +225,12 @@ export default function Knowledge() {
       )}
 
       <Panel className="rise p-5">
-        <h2 className="text-[15px] font-semibold">Search what the agents can retrieve</h2>
+        <div className="kb-chrome">
+        <h2 className="text-[15px] font-semibold">Ask the knowledge base</h2>
         <p className="mt-1 text-[13px] text-[var(--text-muted)]">
-          Business context and past reports. The agents consult this while planning an
-          investigation, not only when writing it up.
+          Answers come from the indexed pages and documents, with the passages they
+          rest on. No spreadsheet needed — this is for questions the data cannot
+          answer.
         </p>
         <form onSubmit={search} className="mt-4 flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
@@ -223,47 +242,123 @@ export default function Knowledge() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="What does net sales mean here?"
+              placeholder="What does this company do?"
               className="pl-9"
             />
           </div>
           <Button type="submit" variant="primary" busy={searching} disabled={!query.trim()}>
-            Search
+            Ask
+          </Button>
+          {/* A brief is the longer form of the same question: several sections
+              instead of a paragraph, and a source list a reader can follow. */}
+          <Button
+            type="button"
+            busy={briefing}
+            disabled={!query.trim()}
+            title="Compose a cited brief from the indexed documents"
+            onClick={async () => {
+              setBriefing(true);
+              setAnswer(null);
+              try {
+                const result = await api.composeBrief(query.trim());
+                setBrief(result.available ? result : null);
+                if (!result.available) setAnswer({ answered: false, answer: result.reason });
+              } catch (err) {
+                setError(err);
+              } finally {
+                setBriefing(false);
+              }
+            }}
+          >
+            <FileText size={14} />
+            Brief
           </Button>
         </form>
 
-        {results !== null && (
-          <div className="mt-4 space-y-2">
+        {answer && (
+          <div
+            className="mt-4 rounded-lg border p-4"
+            style={{ background: "var(--accent-quiet)", borderColor: "var(--accent)" }}
+          >
+            {answer.answer.split("\n\n").map((para, i) => (
+              <p key={i} className={`text-[13.5px] leading-relaxed ${i ? "mt-2" : ""}`}>
+                {para}
+              </p>
+            ))}
+            {answer.answered && (
+              <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--text-muted)]">
+                {answer.note}
+              </p>
+            )}
+          </div>
+        )}
+
+        </div>
+
+        {brief && (
+          <div className="mt-4">
+            <BriefDocument brief={brief} />
+            <div className="no-print mt-3 flex flex-wrap items-center gap-2">
+              <Button onClick={() => window.print()}>
+                <Printer size={14} />
+                Print or save as PDF
+              </Button>
+              {brief.id && (
+                <Button variant="ghost" onClick={() => navigate(`/briefs/${brief.id}`)}>
+                  Open in Briefs
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => setBrief(null)}>
+                Close
+              </Button>
+              {!brief.composed && (
+                <span className="text-[12px] text-[var(--text-muted)]">
+                  No language model configured — this is the retrieved material,
+                  grouped by source.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {results !== null && results.length > 0 && !brief && (
+          <p className="mt-4 text-[12px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+            Passages this rests on
+          </p>
+        )}
+
+        {results !== null && !brief && (
+          <div className="mt-2 space-y-2">
             {results.length ? (
               results.map((r) => (
                 <div
-                  key={r.chunk_id}
+                  key={r.n}
                   className="rounded-lg border p-3"
                   style={{ background: "var(--surface-inset)" }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-medium">{r.document_title}</span>
-                    <Badge tone="neutral">{TYPE_LABEL[r.document_type] || r.document_type}</Badge>
+                    <span className="font-mono text-[12px] text-[var(--accent)]">
+                      [{r.n}]
+                    </span>
+                    <span className="truncate text-[13px] font-medium">{r.title}</span>
+                    <Badge tone="neutral">{TYPE_LABEL[r.type] || r.type}</Badge>
                     <span className="ml-auto font-mono text-[11.5px] text-[var(--text-muted)]">
                       {r.score}
                     </span>
                   </div>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--text-secondary)]">
-                    {r.content.slice(0, 320)}
-                    {r.content.length > 320 && "…"}
+                    {r.excerpt}
                   </p>
                 </div>
               ))
             ) : (
-              <p className="py-4 text-center text-[13px] text-[var(--text-muted)]">
-                Nothing matched. Add a document below and search again.
-              </p>
+              null
             )}
           </div>
         )}
       </Panel>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
+      <div className="kb-chrome mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
         <Panel>
           <PanelHeader
             title="Add context"

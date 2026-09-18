@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { api, getToken, onSignedOut, setToken } from "./api";
 import { Sidebar, TopBar } from "./components/Nav";
+import Briefs from "./pages/Briefs";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
 import DatasetDetail from "./pages/DatasetDetail";
@@ -27,6 +28,10 @@ const PAGE = {
   },
   "/investigations": { title: "Investigations", subtitle: "Every question you have asked" },
   "/reports": { title: "Reports", subtitle: "Findings, forecasts and recommended actions" },
+  "/briefs": {
+    title: "Briefs",
+    subtitle: "Answers assembled from indexed pages and documents",
+  },
   "/knowledge": {
     title: "Knowledge base",
     subtitle: "Business context the agents can retrieve",
@@ -41,6 +46,8 @@ function usePageMeta() {
       title: "Chat",
       subtitle: "Ask in your own words — attach data, answer questions, get a report",
     };
+  if (pathname.startsWith("/briefs/"))
+    return { title: "Brief", subtitle: "Sourced from indexed documents" };
   if (pathname.startsWith("/sources/"))
     return { title: "Dataset", subtitle: "Health, columns, cleaning and lineage" };
   if (pathname.startsWith("/investigations/"))
@@ -141,6 +148,8 @@ export default function App() {
           <Route path="/investigations" element={<Investigations />} />
           <Route path="/investigations/:id" element={<InvestigationDetail />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/briefs" element={<Briefs />} />
+          <Route path="/briefs/:id" element={<Briefs />} />
           <Route path="/knowledge" element={<Knowledge />} />
           <Route
             path="*"

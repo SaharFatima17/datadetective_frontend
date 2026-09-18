@@ -10,6 +10,29 @@ const num = (n, digits = 0) =>
         minimumFractionDigits: digits,
       }).format(n);
 
+/**
+ * A section heading.
+ *
+ * These were pale grey uppercase text — the weakest thing on a page whose
+ * content is the point. In dark mode they nearly vanished. A short accent rule
+ * gives the section a visible start without colouring the words themselves,
+ * which matters because in this report colour carries meaning: teal is
+ * verified, amber is caution. A heading is neither, so it stays neutral and
+ * the rule does the work.
+ */
+function SectionHeading({ children, tone = "var(--accent)" }) {
+  return (
+    <h3 className="flex items-center gap-2.5 text-[12px] font-semibold uppercase
+      tracking-[0.08em] text-[var(--text-secondary)]">
+      <span
+        className="inline-block h-[3px] w-6 shrink-0 rounded-full"
+        style={{ background: tone }}
+      />
+      {children}
+    </h3>
+  );
+}
+
 const TYPE_LABEL = {
   driver: "Explanation",
   association: "Association",
@@ -52,11 +75,17 @@ function ReportChart({ chart }) {
   return (
     <figure className="mt-3">
       {src ? (
-        <img
-          src={src}
-          alt={chart.title}
-          className="w-full max-w-2xl rounded-lg border"
-        />
+        // The chart is rendered server-side on white, which the server must do
+        // because it cannot know the reader's theme. On a dark page that white
+        // block reads as a hole in the layout, so it is mounted on a padded
+        // plate — the same way a printed figure sits on paper inside a darker
+        // binding. In light mode the plate is invisible.
+        <div
+          className="max-w-2xl rounded-lg border p-3"
+          style={{ background: "#ffffff", borderColor: "var(--border-hairline)" }}
+        >
+          <img src={src} alt={chart.title} className="w-full" />
+        </div>
       ) : (
         <Skeleton className="h-52 w-full max-w-2xl" />
       )}
@@ -76,7 +105,15 @@ function ReportChart({ chart }) {
  * label, never as the sole carrier of meaning, so a black-and-white printout
  * loses nothing.
  */
-export default function ReportDocument({ report, state, calculations = {} }) {
+const CHANGE_LINE = {
+  stable: "The cause is the one found previously — the earlier answer held up on new data.",
+  replaced: "The cause has changed since the previous investigation. Acting on the earlier answer would address a problem that has moved.",
+  disappeared: "What explained the change previously no longer does — either it was fixed, or it was specific to that period.",
+  increased: "The same cause, now carrying a larger share of the movement.",
+};
+
+export default function ReportDocument({ report, state, calculations = {},
+                                         comparison = null }) {
   const findings = report.findings || [];
   const driver = findings.find((f) => f.finding_type === "driver");
   const breakdown = driver ? calculations[driver.id]?.result : null;
@@ -98,7 +135,7 @@ export default function ReportDocument({ report, state, calculations = {} }) {
         <h2 className="mt-2.5 text-[24px] font-semibold leading-tight tracking-tight">
           {report.question}
         </h2>
-        <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[12.5px]">
+        <dl className="mt-3.5 flex flex-wrap gap-x-7 gap-y-1.5 text-[12.5px]">
           <div className="flex gap-2">
             <dt className="text-[var(--text-muted)]">Metric</dt>
             <dd className="font-mono">{state?.target_metric || report.target_metric || "—"}</dd>
@@ -109,7 +146,7 @@ export default function ReportDocument({ report, state, calculations = {} }) {
           </div>
           <div className="flex gap-2">
             <dt className="text-[var(--text-muted)]">Verified</dt>
-            <dd className="font-mono">
+            <dd className="font-mono" style={{ color: "var(--accent)" }}>
               {findings.filter((f) => f.verification_status === "verified").length} of{" "}
               {findings.length}
             </dd>
@@ -119,12 +156,31 @@ export default function ReportDocument({ report, state, calculations = {} }) {
 
       {/* ------------------------------ headline ------------------------------ */}
       {driver && (
-        <section
-          className="mt-6 rounded-lg border-l-4 py-4 pl-5 pr-4"
+        <Panel
+          as="section"
+          elevate={3}
+          spotlight
+          tilt
+          className="mt-6 overflow-hidden border-l-4 py-4 pl-5 pr-4 no-print"
           style={{
-            borderColor: "var(--accent)",
+            borderLeftColor: "var(--accent)",
             background: "var(--accent-quiet)",
           }}
+        >
+          <p className="text-[11.5px] font-semibold uppercase tracking-wide text-[var(--accent)]">
+            Headline
+          </p>
+          <p className="mt-1.5 max-w-[64ch] text-[16px] font-medium leading-relaxed">
+            {driver.statement}
+          </p>
+        </Panel>
+      )}
+      {/* the printed version stays flat — depth effects are a screen-only
+          affordance and would either vanish or look like a stray box on paper */}
+      {driver && (
+        <section
+          className="mt-6 hidden rounded-lg border-l-4 py-4 pl-5 pr-4 print:block"
+          style={{ borderColor: "var(--accent)", background: "var(--accent-quiet)" }}
         >
           <p className="text-[11.5px] font-semibold uppercase tracking-wide text-[var(--accent)]">
             Headline
@@ -136,10 +192,8 @@ export default function ReportDocument({ report, state, calculations = {} }) {
       )}
 
       {/* ------------------------------- summary ------------------------------ */}
-      <section className="mt-7">
-        <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-          Summary
-        </h3>
+      <section className="mt-7 rise" style={{ animationDelay: "0.04s" }}>
+        <SectionHeading>Summary</SectionHeading>
         <p className="mt-2 max-w-[68ch] text-[14px] leading-relaxed">
           {report.executive_summary}
         </p>
@@ -147,10 +201,8 @@ export default function ReportDocument({ report, state, calculations = {} }) {
 
       {/* ------------------------------ breakdown ----------------------------- */}
       {groups.length > 0 && (
-        <section className="mt-7">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Breakdown by {breakdown.by}
-          </h3>
+        <section className="mt-7 rise" style={{ animationDelay: "0.08s" }}>
+          <SectionHeading>Breakdown by {breakdown.by}</SectionHeading>
           <table className="mt-2 w-full text-[13px]">
             <thead>
               <tr className="border-b text-left text-[11.5px] text-[var(--text-muted)]">
@@ -192,19 +244,15 @@ export default function ReportDocument({ report, state, calculations = {} }) {
       {/* -------------------------------- chart -------------------------------- */}
       {(report.charts || []).map((c) => (
         <section key={c.id} className="mt-7">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            {c.title}
-          </h3>
+          <SectionHeading>{c.title}</SectionHeading>
           <ReportChart chart={c} />
         </section>
       ))}
 
       {/* ------------------------------ findings ------------------------------ */}
       {findings.length > 0 && (
-        <section className="mt-7">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Findings
-          </h3>
+        <section className="mt-7 rise" style={{ animationDelay: "0.12s" }}>
+          <SectionHeading>Findings</SectionHeading>
           <ol className="mt-2 space-y-4">
             {findings.map((f, i) => (
               <li key={f.id || i} className="flex gap-3">
@@ -239,10 +287,8 @@ export default function ReportDocument({ report, state, calculations = {} }) {
 
       {/* ------------------------------ forecast ------------------------------ */}
       {forecast && (
-        <section className="mt-7">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Outlook
-          </h3>
+        <section className="mt-7 rise" style={{ animationDelay: "0.16s" }}>
+          <SectionHeading>Outlook</SectionHeading>
           {forecast.reliability === "ok" && forecast.predictions?.length ? (
             <>
               <table className="mt-2 w-full max-w-md text-[13px]">
@@ -285,10 +331,8 @@ export default function ReportDocument({ report, state, calculations = {} }) {
 
       {/* --------------------------- recommendations -------------------------- */}
       {report.recommendations?.length > 0 && (
-        <section className="mt-7">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Recommended actions
-          </h3>
+        <section className="mt-7 rise" style={{ animationDelay: "0.20s" }}>
+          <SectionHeading>Recommended actions</SectionHeading>
           <ol className="mt-2 space-y-3">
             {report.recommendations.map((r, i) => (
               <li key={i} className="max-w-[68ch]">
@@ -313,10 +357,8 @@ export default function ReportDocument({ report, state, calculations = {} }) {
 
       {/* ----------------------------- unresolved ----------------------------- */}
       {report.unresolved_hypotheses?.length > 0 && (
-        <section className="mt-7">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Left unresolved
-          </h3>
+        <section className="mt-7 rise" style={{ animationDelay: "0.24s" }}>
+          <SectionHeading>Left unresolved</SectionHeading>
           <ul className="mt-2 space-y-1.5">
             {report.unresolved_hypotheses.map((h, i) => (
               <li key={i} className="max-w-[68ch] text-[13.5px] leading-relaxed">
@@ -327,13 +369,61 @@ export default function ReportDocument({ report, state, calculations = {} }) {
         </section>
       )}
 
+      {/* ------------------------ against last time --------------------------- */}
+      {comparison?.available && (
+        <section className="mt-7 rise" style={{ animationDelay: "0.28s" }}>
+          <SectionHeading>Compared with the previous investigation</SectionHeading>
+          <p className="mt-2 max-w-[68ch] text-[14px] leading-relaxed">
+            {CHANGE_LINE[comparison.driver_change] || comparison.summary}
+          </p>
+          <div className="mt-2 grid max-w-[68ch] gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-[11.5px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                Previously
+              </p>
+              {(comparison.previous_drivers || ["No driver found"]).map((d, i) => (
+                <p key={i} className="mt-0.5 text-[12.5px] leading-relaxed">{d}</p>
+              ))}
+            </div>
+            <div>
+              <p className="text-[11.5px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                Now
+              </p>
+              {(comparison.current_drivers || ["No driver found"]).map((d, i) => (
+                <p key={i} className="mt-0.5 text-[12.5px] leading-relaxed">{d}</p>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* --------------------------- reviewer concerns ------------------------ */}
+      {report.critique?.concerns?.length > 0 && (
+        <section className="mt-7 rise" style={{ animationDelay: "0.28s" }}>
+          <SectionHeading tone="var(--color-amber-soft)">Reviewer concerns</SectionHeading>
+          {/* These are the critic agent's objections to the findings above. A
+              report that keeps its own reviewer's doubts out of the document is
+              exactly the kind of answer this system is built to avoid, so they
+              are printed alongside the conclusions rather than filed elsewhere. */}
+          <ul className="mt-2.5 space-y-2">
+            {report.critique.concerns.map((c, i) => (
+              <li
+                key={i}
+                className="max-w-[68ch] border-l-2 pl-3 text-[13px] leading-relaxed"
+                style={{ borderColor: "var(--color-amber-soft)" }}
+              >
+                {c}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* --------------------------- what was read ---------------------------- */}
       {(report.retrieval?.context_documents?.length > 0 ||
         report.retrieval?.definitions_used?.length > 0) && (
-        <section className="mt-7">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Background consulted
-          </h3>
+        <section className="mt-7 rise" style={{ animationDelay: "0.28s" }}>
+          <SectionHeading>Background consulted</SectionHeading>
           <ul className="mt-2 space-y-1.5">
             {[...(report.retrieval.definitions_used || []),
               ...(report.retrieval.context_documents || [])].map((d, i) => (
@@ -351,15 +441,17 @@ export default function ReportDocument({ report, state, calculations = {} }) {
 
       {/* ---------------------------- limitations ----------------------------- */}
       {report.limitations?.length > 0 && (
-        <section className="mt-8 border-t pt-5">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            Limitations
-          </h3>
-          <ul className="mt-2 space-y-1.5">
+        <section className="mt-8 border-t pt-6">
+          <SectionHeading tone="var(--border-strong)">Limitations</SectionHeading>
+          {/* Previously the palest text on the page. What an answer does not
+              claim is part of the answer, so it is set at reading weight. */}
+          <ul className="mt-2.5 space-y-2">
             {report.limitations.map((l, i) => (
               <li
                 key={i}
-                className="max-w-[68ch] text-[12.5px] leading-relaxed text-[var(--text-muted)]"
+                className="max-w-[68ch] border-l-2 pl-3 text-[12.5px] leading-relaxed
+                  text-[var(--text-secondary)]"
+                style={{ borderColor: "var(--border-hairline)" }}
               >
                 {l}
               </li>

@@ -133,7 +133,7 @@ export default function Dashboard({ user }) {
           data, verify every number, and tell you what they could not establish.
         </p>
 
-        <Panel className="mt-5 p-4">
+        <Panel className="mt-5 p-4" elevate={3} spotlight>
           {datasets?.length ? (
             <form onSubmit={ask}>
               <div className="flex flex-col gap-3 sm:flex-row">
@@ -148,8 +148,10 @@ export default function Dashboard({ user }) {
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder="Why did revenue decline?"
                     className="h-11 w-full rounded-lg border bg-[var(--surface-inset)] pl-9 pr-3
-                      text-[14.5px] outline-none transition-colors
-                      placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
+                      text-[14.5px] outline-none transition-[border-color,box-shadow]
+                      placeholder:text-[var(--text-muted)] hover:border-[var(--border-strong)]
+                      focus:border-[var(--accent)]
+                      focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_14%,transparent)]"
                   />
                 </div>
                 <select
@@ -172,7 +174,12 @@ export default function Dashboard({ user }) {
                   disabled={!question.trim()}
                 >
                   {running ? "Investigating" : "Investigate"}
-                  {!running && <ArrowRight size={16} />}
+                  {!running && (
+                    <ArrowRight
+                      size={16}
+                      className="transition-transform duration-200 group-hover:translate-x-0.5"
+                    />
+                  )}
                 </Button>
               </div>
 
@@ -235,26 +242,34 @@ export default function Dashboard({ user }) {
           ))
         ) : (
           <>
-            <Panel className="p-5">
-              <Stat label="Datasets" value={datasets.length} hint="available to investigate" />
-            </Panel>
-            <Panel className="p-5">
+            <Panel className="p-5" elevate={2} spotlight>
               <Stat
+                icon={Database}
+                label="Datasets"
+                value={datasets.length}
+                hint="available to investigate"
+              />
+            </Panel>
+            <Panel className="p-5" elevate={2} spotlight>
+              <Stat
+                icon={Search}
                 label="Investigations"
                 value={investigations.length}
                 hint={`${complete.length} completed`}
               />
             </Panel>
-            <Panel className="p-5">
+            <Panel className="p-5" elevate={2} spotlight>
               <Stat
+                icon={Sparkles}
                 label="Awaiting your input"
                 value={waiting.length}
                 hint="paused for missing evidence"
                 tone={waiting.length ? "var(--color-amber-soft)" : undefined}
               />
             </Panel>
-            <Panel className="p-5">
+            <Panel className="p-5" elevate={2} spotlight>
               <Stat
+                icon={FileText}
                 label="Versions kept"
                 value={datasets.reduce((n, d) => n + (d.versions || 0), 0)}
                 hint="originals never overwritten"
@@ -349,10 +364,12 @@ export default function Dashboard({ user }) {
                   <Tooltip
                     cursor={{ fill: "var(--surface-sunken)" }}
                     contentStyle={{
-                      background: "var(--surface-raised)",
+                      background: "var(--glass-surface)",
+                      backdropFilter: "blur(14px) saturate(1.4)",
                       border: "1px solid var(--border-hairline)",
                       borderRadius: 8,
                       fontSize: 12,
+                      boxShadow: "var(--shadow-md)",
                     }}
                     formatter={(v) => [`${v} / 100`, "health"]}
                   />

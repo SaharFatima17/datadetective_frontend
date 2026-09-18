@@ -37,18 +37,23 @@ export default function Login({ onSignedIn }) {
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
       {/* The left panel states what the product actually claims, rather than
-          decorating the sign-in with a gradient. */}
+          decorating the sign-in with a gradient. It is always the dark ink
+          surface regardless of the active theme, so its colours are fixed
+          rather than pulled from the flippable tokens. */}
       <div
         className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex"
-        style={{ background: "var(--color-ink-950)" }}
+        style={{ background: "#0b1020" }}
       >
         <div className="flex items-center gap-2.5">
           <svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true">
-            <circle cx="14" cy="14" r="7" fill="none" stroke="#35d6b4" strokeWidth="2.5" />
-            <path d="M19 19 L26 26" stroke="#35d6b4" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="14" cy="14" r="2" fill="#35d6b4" />
+            <circle cx="14" cy="14" r="7" fill="none" stroke="#22d3ee" strokeWidth="2.5" />
+            <path d="M19 19 L26 26" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="14" cy="14" r="2" fill="#22d3ee" />
           </svg>
-          <span className="text-[15px] font-semibold text-white">DataDetective</span>
+          <span className="text-[15px] font-semibold">
+            <span className="text-white">Data</span>
+            <span className="text-[#22d3ee]">Detective</span>
+          </span>
         </div>
 
         <div className="max-w-md">
@@ -61,15 +66,15 @@ export default function Login({ onSignedIn }) {
               ["Lineage", "Cleaning writes a new version. The file you uploaded is never altered."],
               ["Honesty", "When the data can't answer the question, it asks you instead of guessing."],
             ].map(([term, detail]) => (
-              <div key={term} className="border-l-2 pl-4" style={{ borderColor: "#0a6f5b" }}>
-                <dt className="font-medium text-[#35d6b4]">{term}</dt>
-                <dd className="mt-0.5 text-ink-300">{detail}</dd>
+              <div key={term} className="border-l-2 pl-4" style={{ borderColor: "#0e7490" }}>
+                <dt className="font-medium text-[#22d3ee]">{term}</dt>
+                <dd className="mt-0.5 text-[#94a3b8]">{detail}</dd>
               </div>
             ))}
           </dl>
         </div>
 
-        <p className="font-mono text-[11.5px] text-ink-500">
+        <p className="font-mono text-[11.5px] text-[#64748b]">
           Internship project · Zylo Technologies
         </p>
       </div>

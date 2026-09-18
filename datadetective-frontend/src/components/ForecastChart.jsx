@@ -22,10 +22,7 @@ function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   return (
-    <div
-      className="rounded-lg border px-3 py-2 text-[12px] shadow-lg"
-      style={{ background: "var(--surface-raised)" }}
-    >
+    <div className="glass rounded-lg px-3 py-2 text-[12px]">
       <div className="mb-1 font-medium">{label}</div>
       {row.actual != null && (
         <div className="font-mono">actual {compact(row.actual)}</div>

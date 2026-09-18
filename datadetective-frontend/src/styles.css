@@ -3,85 +3,116 @@
 /* ------------------------------------------------------------------ *
  * DataDetective — design tokens
  *
- * The palette carries information rather than decoration. This product's
- * whole claim is that a stated cause is traceable, so the colours encode
- * exactly that distinction:
+ * Colour carries meaning, not decoration:
  *
- *   verified   teal    a claim whose calculation was re-run and matched
- *   driver     teal    an explanation
- *   assoc      amber   two things move together; not an explanation
- *   measure    slate   what changed; not an explanation
- *   alert      red     a defect in the data
+ *   verified     green    a claim whose calculation was re-run and matched
+ *   key insight  cyan     the main answer / primary evidence / driver
+ *   association  amber    two things move together; not an explanation,
+ *                         or: an estimate/assumption that needs validation
+ *   measurement  grey     what changed; not an explanation
+ *   alert        pink/red a defect, a failed check, a critical/urgent item
+ *   ai           purple   used sparingly for AI/intelligence-related accents
  *
- * Nothing else in the interface is allowed to use those hues, so a colour
- * always means the same thing wherever it appears.
+ * Nothing else in the interface uses those hues, so a colour always means
+ * the same thing wherever it appears.
  * ------------------------------------------------------------------ */
 
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  --color-ink-50: #f5f7fa;
-  --color-ink-100: #e9edf3;
-  --color-ink-200: #d3dbe6;
-  --color-ink-300: #adbaca;
-  --color-ink-400: #7d8da3;
-  --color-ink-500: #5a6b81;
-  --color-ink-600: #435265;
-  --color-ink-700: #2c3849;
-  --color-ink-800: #18222f;
-  --color-ink-900: #0e1620;
-  --color-ink-950: #070d14;
+  /* theme-invariant constants: a "soft" (readable on dark) and "deep"
+     (readable on light) version of each warning/alert hue, switched at the
+     Tailwind class level with dark: rather than flipped per-theme */
+  --color-amber-soft: #fbbf24;
+  --color-amber-deep: #d97706;
+  --color-alert-soft: #fb7185;
+  --color-alert-deep: #e11d48;
 
-  /* verification / driver */
-  --color-signal-300: #6fe9cf;
-  --color-signal-400: #35d6b4;
-  --color-signal-500: #12b894;
-  --color-signal-600: #0a8f73;
-  --color-signal-700: #0a6f5b;
-
-  /* association / caution */
-  --color-amber-soft: #f0b429;
-  --color-amber-deep: #a86b00;
-
-  /* defects */
-  --color-alert-soft: #f2555a;
-  --color-alert-deep: #b3252b;
-
-  --radius-card: 14px;
+  --radius-card: 12px;
 }
 
 /* Semantic surfaces, flipped by the `dark` class on <html>. Components
    reference these rather than raw palette values, so theming stays in one
    place instead of being sprinkled through every file as dark: variants. */
 :root {
-  --surface-page: #f2f5f9;
+  --surface-page: #f7f9fc;
   --surface-raised: #ffffff;
-  --surface-sunken: #e8edf4;
-  --surface-inset: #f6f8fb;
-  --border-hairline: #dae1ea;
-  --border-strong: #c2ccd9;
-  --text-primary: #0e1620;
-  --text-secondary: #4c5b6f;
-  --text-muted: #7d8da3;
-  --accent: #0a8f73;
-  --accent-quiet: #e2f6f0;
-  --shadow-card: 0 1px 2px rgba(14, 22, 32, 0.05), 0 8px 24px -16px rgba(14, 22, 32, 0.3);
+  --surface-sunken: #f1f5f9;
+  --surface-inset: #f8fafc;
+  --border-hairline: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  --accent: #0891b2;           /* primary cyan, light mode */
+  --accent-hover: #0e7490;
+  --on-accent: #ffffff;        /* text/icons drawn on a solid accent fill */
+  --accent-quiet: color-mix(in srgb, var(--accent) 10%, transparent);
+
+  --color-success: #059669;
+  --success-quiet: color-mix(in srgb, var(--color-success) 10%, transparent);
+
+  --brand: #7c3aed;            /* AI / intelligence accent — used sparingly */
+  --brand-quiet: color-mix(in srgb, var(--brand) 10%, transparent);
+
+  /* a very soft ambient wash in light mode too, so the page doesn't read as
+     a flat white/grey rectangle — barely-there cyan and violet glows in the
+     two top corners, the same idea dark mode already used. */
+  --surface-page-wash:
+    radial-gradient(55% 40% at 92% 0%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 70%),
+    radial-gradient(50% 38% at 4% 100%, color-mix(in srgb, var(--brand) 4%, transparent), transparent 70%);
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -10px rgba(15, 23, 42, 0.12);
+  --shadow-card-hover: 0 2px 4px rgba(15, 23, 42, 0.06), 0 10px 22px -10px rgba(15, 23, 42, 0.16);
+
+  /* Depth scale — three named sizes rather than one shadow reused everywhere,
+     so a card's elevation says something about its importance. */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 15px -8px rgba(15, 23, 42, 0.14);
+  --shadow-md: 0 2px 6px rgba(15, 23, 42, 0.06), 0 10px 30px -12px rgba(15, 23, 42, 0.18);
+  --shadow-lg: 0 4px 10px rgba(15, 23, 42, 0.08), 0 20px 50px -16px rgba(15, 23, 42, 0.22);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --glass-surface: color-mix(in srgb, var(--surface-raised) 72%, transparent);
 }
 
 html.dark {
-  --surface-page: #070d14;
-  --surface-raised: #0e1620;
-  --surface-sunken: #18222f;
-  --surface-inset: #121c27;
-  --border-hairline: #22303f;
-  --border-strong: #33445a;
-  --text-primary: #e9edf3;
-  --text-secondary: #adbaca;
-  --text-muted: #7d8da3;
-  --accent: #35d6b4;
-  --accent-quiet: #0d2b25;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -20px rgba(0, 0, 0, 0.9);
+  --surface-page: #0b1020;
+  --surface-raised: #111827;
+  --surface-sunken: #151f32;
+  --surface-inset: #0f172a;
+  --border-hairline: #243047;
+  --border-strong: #34445f;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent: #22d3ee;           /* primary cyan, dark mode */
+  --accent-hover: #06b6d4;
+  --on-accent: #061019;        /* dark ink — cyan is too light for white text */
+  --accent-quiet: color-mix(in srgb, var(--accent) 14%, transparent);
+
+  --color-success: #34d399;
+  --success-quiet: color-mix(in srgb, var(--color-success) 14%, transparent);
+
+  --brand: #a78bfa;
+  --brand-quiet: color-mix(in srgb, var(--brand) 14%, transparent);
+
+  /* extremely subtle ambient glows: cyan upper-right, purple lower-left.
+     Kept at very low opacity so the surface still reads as a flat, dark,
+     professional background rather than a neon backdrop. */
+  --surface-page-wash:
+    radial-gradient(60% 50% at 88% 6%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%),
+    radial-gradient(55% 45% at 6% 96%, color-mix(in srgb, var(--brand) 6%, transparent), transparent 70%);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px -12px rgba(0, 0, 0, 0.7);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 14px 28px -14px rgba(0, 0, 0, 0.75);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 15px -8px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 10px 30px -12px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 6px 14px rgba(0, 0, 0, 0.4), 0 20px 50px -16px rgba(0, 0, 0, 0.6);
+  --inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  --glass-surface: color-mix(in srgb, var(--surface-raised) 58%, transparent);
 }
 
 * {
@@ -96,7 +127,7 @@ body,
 
 body {
   margin: 0;
-  background: var(--surface-page);
+  background: var(--surface-page-wash), var(--surface-page);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1; /* tabular figures: numbers must align in tables */
@@ -159,8 +190,18 @@ body {
   }
 }
 
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .rise {
-  animation: rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .shimmer {
@@ -172,6 +213,33 @@ body {
   );
   background-size: 200% 100%;
   animation: sweep 1.4s linear infinite;
+}
+
+/* the "current step" marker on an in-progress investigation timeline */
+.pulse-current {
+  animation: soft-pulse 1.6s ease-in-out infinite;
+}
+
+/* Timeline node glows — a soft halo, not a flood-lit dot. Matches the
+   verified/current/alert semantics used everywhere else. */
+.node-glow-verified {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-success) 14%, transparent);
+}
+.node-glow-current {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.node-glow-alert {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-alert-soft) 14%, transparent);
+}
+.node-glow-verified,
+.node-glow-current,
+.node-glow-alert {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+li:hover > .node-glow-verified,
+li:hover > .node-glow-current,
+li:hover > .node-glow-alert {
+  transform: scale(1.15);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -203,6 +271,164 @@ body {
   display: none;
 }
 
+/* Panels get a small lift on hover, with a hint of 3D depth (a light
+   perspective tilt, not a flat translate) and a faint accent-tinted edge —
+   enough to feel touchable and alive without turning the card into a
+   glowing button. */
+.panel-hover {
+  transform-style: preserve-3d;
+  perspective: 900px;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.panel-hover:hover {
+  transform: translateY(-3px) rotateX(1.2deg) scale(1.003);
+  box-shadow: var(--shadow-card-hover), 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-strong));
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-hover:hover {
+    transform: none;
+  }
+}
+
+/* A soft sliding underline for links and nav items — draws in from the left
+   on hover/focus, and stays filled when the item is active. */
+.underline-hover {
+  position: relative;
+  text-decoration: none;
+}
+.underline-hover::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: -2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: right 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.underline-hover:hover::after,
+.underline-hover:focus-visible::after,
+.underline-hover.is-active::after {
+  right: 0;
+}
+
+/* ---------------------------------------------------------------- *
+ * Depth system
+ *
+ * Three elevation levels, so a glance at a screen tells you which cards
+ * matter without reading them. Every level carries the same inner
+ * highlight — a 1px seam of light along the top edge — because that single
+ * detail is what separates "flat rectangle" from "surface catching light".
+ * ---------------------------------------------------------------- */
+.elevate-1 {
+  box-shadow: var(--shadow-sm), var(--inner-highlight);
+}
+.elevate-2 {
+  box-shadow: var(--shadow-md), var(--inner-highlight);
+}
+.elevate-3 {
+  box-shadow: var(--shadow-lg), var(--inner-highlight);
+}
+.elevate-1,
+.elevate-2,
+.elevate-3 {
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+.elevate-1:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), var(--inner-highlight);
+  border-color: var(--border-strong);
+}
+.elevate-2:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg), var(--inner-highlight);
+  border-color: var(--border-strong);
+}
+.elevate-3:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg), var(--inner-highlight),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
+}
+
+/* Glass surface for floating, transient UI — tooltips, small overlays,
+   floating status chips. Not used for primary reading surfaces: a report
+   you print or hand to someone has to stay opaque. */
+.glass {
+  background: var(--glass-surface);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--border-hairline);
+  box-shadow: var(--shadow-md);
+}
+
+/* Cursor-following spotlight. A child element with this class reads two CSS
+   custom properties, --spot-x/--spot-y, that JS keeps updated on pointer
+   move; the glow itself is pure CSS so nothing re-renders on mousemove. */
+.spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(
+    420px circle at var(--spot-x, 50%) var(--spot-y, 0%),
+    color-mix(in srgb, var(--accent) 10%, transparent),
+    transparent 60%
+  );
+}
+.spotlight-host:hover .spotlight {
+  opacity: 1;
+}
+
+/* Subtle pointer-tilt for a handful of showcase cards only (hero, key
+   stats, the headline answer, a selected recommendation) — never on dense
+   report content or tables. JS sets --tilt-x/--tilt-y in degrees; CSS does
+   the rest, and resets smoothly the moment the pointer leaves. */
+@media (hover: hover) and (pointer: fine) {
+  .tilt-card {
+    transform: perspective(1000px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-card {
+    transform: none !important;
+  }
+  .spotlight {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Tables
+ *
+ * Every table in the app shares this base look, rather than each page
+ * re-deriving "header row a shade darker, body row brightens on hover" —
+ * that consistency is itself part of feeling premium.
+ * ---------------------------------------------------------------- */
+table thead tr {
+  background: var(--surface-inset);
+}
+table tbody tr {
+  transition: background-color 0.12s ease;
+}
+table tbody tr:hover {
+  background: var(--surface-sunken);
+}
+/* the printed report keeps its rows flat — a hover state means nothing on paper */
+@media print {
+  table tbody tr:hover {
+    background: transparent;
+  }
+}
 
 /* ---------------------------------------------------------------- *
  * Print
@@ -220,16 +446,18 @@ body {
   /* force the light palette: dark mode wastes ink and reads badly on paper */
   html.dark {
     --surface-page: #ffffff;
+    --surface-page-wash: none;
     --surface-raised: #ffffff;
-    --surface-sunken: #f2f5f9;
-    --surface-inset: #f6f8fb;
-    --border-hairline: #d3dbe6;
-    --border-strong: #adbaca;
-    --text-primary: #0e1620;
-    --text-secondary: #2c3849;
-    --text-muted: #435265;
-    --accent: #0a6f5b;
-    --accent-quiet: #eef6f4;
+    --surface-sunken: #f1f5f9;
+    --surface-inset: #f8fafc;
+    --border-hairline: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --accent: #0e7490;
+    --accent-quiet: #e6f6f9;
+    --color-success: #047857;
   }
 
   body {
