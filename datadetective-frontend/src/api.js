@@ -103,22 +103,26 @@ export const api = {
   info: () => request("/api"),
 
   // --- sources and datasets ---------------------------------------- //
-  upload: (file) => {
+  upload: (file, subject = null) => {
     const form = new FormData();
     form.append("file", file);
+    if (subject) form.append("subject", subject);
     return request("/api/sources/upload", { method: "POST", form });
   },
   ingestSql: (payload) =>
     request("/api/sources/sql", { method: "POST", body: payload }),
   crawlSite: (payload) =>
     request("/api/sources/crawl", { method: "POST", body: payload }),
-  composeBrief: (query, topK = 14) =>
-    request("/api/brief", { method: "POST", body: { query, top_k: topK } }),
+  composeBrief: (query, topK = 14, scope = null) =>
+    request("/api/brief", { method: "POST", body: { query, top_k: topK, scope } }),
+  knowledgeScopes: () => request("/api/knowledge/scopes"),
+  setDocumentSubject: (id, subject) =>
+    request(`/api/documents/${id}/subject`, { method: "PATCH", body: { subject } }),
   briefs: () => request("/api/briefs"),
   brief: (id) => request(`/api/briefs/${id}`),
   deleteBrief: (id) => request(`/api/briefs/${id}`, { method: "DELETE" }),
-  askDocuments: (query, topK = 6) =>
-    request("/api/ask", { method: "POST", body: { query, top_k: topK } }),
+  askDocuments: (query, topK = 6, scope = null) =>
+    request("/api/ask", { method: "POST", body: { query, top_k: topK, scope } }),
   ingestUrl: (payload) =>
     request("/api/sources/url", { method: "POST", body: payload }),
   sources: () => request("/api/sources"),
@@ -195,6 +199,27 @@ export const api = {
   abandon: (id) =>
     request(`/api/investigations/${id}/abandon`, { method: "POST" }),
   report: (id) => request(`/api/investigations/${id}/report`),
+  /**
+   * The evidence chain as a file. Fetched with the session token and saved
+   * through an object URL, because a plain link cannot carry authentication
+   * and opening the endpoint to unauthenticated requests would be the wrong
+   * trade for one download button.
+   */
+  downloadBundle: async (id) => {
+    const response = await fetch(`${BASE}/api/investigations/${id}/bundle`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new ApiError("The bundle could not be built", response.status);
+    const disposition = response.headers.get("content-disposition") || "";
+    const name = disposition.match(/filename="?([^"]+)"?/)?.[1] || "evidence.zip";
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+    return name;
+  },
   comparison: (id) => request(`/api/investigations/${id}/comparison`),
   timeline: (id) => request(`/api/investigations/${id}/timeline`),
   evidence: (id) => request(`/api/investigations/${id}/evidence`),
@@ -218,6 +243,51 @@ export const api = {
     }),
   newConversation: (payload = {}) =>
     request("/api/chat/conversations", { method: "POST", body: payload }),
+  /**
+   * Send a message and hear what is happening while the reply is prepared.
+   * `onStage` is called with each stage as the server reports it. Resolves
+   * with the finished messages, exactly as `sendMessage` does.
+   */
+  sendMessageStream: async (id, content, onStage) => {
+    const response = await fetch(
+      `${BASE}/api/chat/conversations/${id}/messages/stream`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ content }),
+      },
+    );
+    if (!response.ok || !response.body) {
+      throw new ApiError("The reply could not be started", response.status);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finished = null;
+
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let cut;
+      while ((cut = buffer.indexOf("\n\n")) !== -1) {
+        const block = buffer.slice(0, cut);
+        buffer = buffer.slice(cut + 2);
+        const line = block.split("\n").find((l) => l.startsWith("data: "));
+        if (!line) continue;                      // keep-alive comment
+        const event = JSON.parse(line.slice(6));
+        if (event.type === "stage") onStage?.(event.text);
+        else if (event.type === "done") finished = { messages: event.messages };
+        else if (event.type === "error") throw new ApiError(event.detail, 500);
+      }
+    }
+    if (!finished) throw new ApiError("The reply ended before it was finished", 500);
+    return finished;
+  },
   sendMessage: (id, content) =>
     request(`/api/chat/conversations/${id}/messages`, {
       method: "POST",

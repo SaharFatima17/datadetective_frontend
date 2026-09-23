@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, GitCompare, HelpCircle, Lightbulb, MessageSquare, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookOpen, Download, GitCompare, HelpCircle, Lightbulb, MessageSquare, Upload } from "lucide-react";
 import { api } from "../api";
 import ForecastChart from "../components/ForecastChart";
 import RecommendationCard from "../components/RecommendationCard";
@@ -158,6 +158,63 @@ function ChartPanel({ chart }) {
   );
 }
 
+/**
+ * The headline direction contradicts every group.
+ *
+ * Placed above the findings, not among the caveats. This is the one case where
+ * every figure in the report can be correct and the conclusion still inverted:
+ * the total rose while the average fell in every group, because the mix of rows
+ * changed. A reader who acts on the headline would act on the opposite of what
+ * happened, so the warning goes where they cannot miss it.
+ */
+function MixWarning({ warning }) {
+  if (!warning) return null;
+  return (
+    <Panel>
+      <div
+        className="border-l-4 px-5 py-4"
+        style={{ borderColor: "var(--color-amber-soft)" }}
+      >
+        <p className="flex items-center gap-2 text-[13px] font-semibold uppercase
+          tracking-wide" style={{ color: "var(--color-amber-soft)" }}>
+          <AlertTriangle size={14} />
+          Read the total with care
+        </p>
+        <p className="mt-2 max-w-[70ch] text-[14px] leading-relaxed">{warning.note}</p>
+
+        <table className="mt-3 w-full max-w-xl text-[12.5px]">
+          <thead>
+            <tr className="text-left text-[var(--text-muted)]">
+              <th className="pb-1 font-medium">Group</th>
+              <th className="pb-1 text-right font-medium">Average before</th>
+              <th className="pb-1 text-right font-medium">Average after</th>
+              <th className="pb-1 text-right font-medium">Share of rows</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warning.groups.map((g) => (
+              <tr key={g.group} className="border-t">
+                <td className="py-1.5 font-medium">{g.group}</td>
+                <td className="py-1.5 text-right font-mono">{g.avg_before}</td>
+                <td className="py-1.5 text-right font-mono">
+                  {g.avg_after}
+                  <span className="ml-2 text-[var(--text-muted)]">
+                    {g.avg_change_pct > 0 ? "+" : ""}
+                    {g.avg_change_pct}%
+                  </span>
+                </td>
+                <td className="py-1.5 text-right font-mono text-[var(--text-muted)]">
+                  {g.share_before}% → {g.share_after}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
 export default function InvestigationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -173,6 +230,7 @@ export default function InvestigationDetail() {
   const [resuming, setResuming] = useState(false);
   const [resumeError, setResumeError] = useState(null);
   const [openingChat, setOpeningChat] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   /* Hands the reader a conversation about this investigation, rather than an
      empty one they would have to re-attach data to. */
@@ -294,10 +352,30 @@ export default function InvestigationDetail() {
         </div>
         <div className="flex items-center gap-2">
           {state.status === "complete" && (
-            <Button size="sm" busy={openingChat} onClick={openChat}>
-              <MessageSquare size={14} />
-              Ask about this
-            </Button>
+            <>
+              <Button
+                size="sm"
+                busy={downloading}
+                title="Report, findings, and every calculation with its checksum"
+                onClick={async () => {
+                  setDownloading(true);
+                  try {
+                    await api.downloadBundle(id);
+                  } catch (err) {
+                    setError(err);
+                  } finally {
+                    setDownloading(false);
+                  }
+                }}
+              >
+                <Download size={14} />
+                Evidence bundle
+              </Button>
+              <Button size="sm" busy={openingChat} onClick={openChat}>
+                <MessageSquare size={14} />
+                Ask about this
+              </Button>
+            </>
           )}
           <Badge tone={state.status === "complete" ? "verified" : "association"}>
             {state.status.replace(/_/g, " ")}
@@ -446,6 +524,8 @@ export default function InvestigationDetail() {
                 </div>
               </div>
             )}
+
+            {report.mix_warning && <MixWarning warning={report.mix_warning} />}
 
             {comparison?.available && <DriverChange comparison={comparison} />}
 

@@ -52,6 +52,8 @@ export default function Sources() {
   const [url, setUrl] = useState("");
   const [crawl, setCrawl] = useState(true);
   const [pages, setPages] = useState(15);
+  const [removing, setRemoving] = useState(null);
+  const [subject, setSubject] = useState("");
 
   async function load() {
     setError(null);
@@ -208,6 +210,19 @@ export default function Sources() {
                 </span>
               </CheckRow>
 
+              {/* Naming the subject here is what lets a crawled site and an
+                  uploaded document about the same company be asked as one. */}
+              <Field
+                label="Subject"
+                hint="optional — groups these pages with other material on the same subject"
+              >
+                <Input
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="e.g. Zylo"
+                />
+              </Field>
+
               {crawl && (
                 <Field label="Page limit" hint="stops when it reaches this many">
                   <Input
@@ -228,7 +243,13 @@ export default function Sources() {
                 onClick={() =>
                   crawl
                     ? run(
-                        () => api.crawlSite({ url, max_pages: pages, max_depth: 2 }),
+                        () =>
+                          api.crawlSite({
+                            url,
+                            max_pages: pages,
+                            max_depth: 2,
+                            subject: subject.trim() || null,
+                          }),
                         (r) =>
                           `${r.pages_indexed} page${r.pages_indexed === 1 ? "" : "s"}` +
                           (r.documents_indexed
@@ -238,7 +259,12 @@ export default function Sources() {
                           (r.failed?.length ? ` ${r.failed.length} address(es) could not be read.` : ""),
                       )
                     : run(
-                        () => api.ingestUrl({ url, index_for_rag: true }),
+                        () =>
+                          api.ingestUrl({
+                            url,
+                            index_for_rag: true,
+                            subject: subject.trim() || null,
+                          }),
                         (r) => `Retrieved and indexed in ${r.chunks} passages.`,
                       )
                 }
@@ -336,10 +362,11 @@ export default function Sources() {
                     {s.status}
                   </Badge>
                   <DeleteButton
-                    label={`Delete ${s.name}`}
-                    detail="Removes the snapshot and anything indexed from it"
-                    prompt="Delete this source?"
-                    onDelete={async () => {
+                    title={`Delete ${s.name} — removes the snapshot and anything indexed from it`}
+                    busy={removing === s.id}
+                    onClick={async () => {
+                      setRemoving(s.id);
+                      setActionError(null);
                       try {
                         await api.deleteSource(s.id);
                         await load();
@@ -347,6 +374,8 @@ export default function Sources() {
                         // A source a dataset was built from is refused, with the
                         // reason — shown rather than swallowed.
                         setActionError(err);
+                      } finally {
+                        setRemoving(null);
                       }
                     }}
                   />

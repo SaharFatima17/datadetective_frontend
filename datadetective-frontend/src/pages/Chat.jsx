@@ -307,6 +307,25 @@ function ThreadRow({ thread, active, onOpen, onDelete }) {
 }
 
 /* ------------------------------------------------------------------ */
+/** Seconds since the reply was requested, ticking once a second. */
+function Elapsed({ since }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!since) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [since]);
+  if (!since) return null;
+  const seconds = Math.max(0, Math.round((now - since) / 1000));
+  // Only worth showing once the wait is noticeable.
+  if (seconds < 3) return null;
+  return (
+    <span className="font-mono text-[11.5px] text-[var(--text-muted)]">
+      · {seconds}s
+    </span>
+  );
+}
+
 export default function Chat() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -315,6 +334,8 @@ export default function Chat() {
   const [thread, setThread] = useState(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState(null);
+  const [startedAt, setStartedAt] = useState(null);
   const [error, setError] = useState(null);
   const [dragging, setDragging] = useState(false);
   const [unavailable, setUnavailable] = useState(null);
@@ -413,8 +434,22 @@ export default function Chat() {
     // makes the interface feel like it dropped the message.
     appendLocal({ id: `local-${Date.now()}`, role: "user", kind: "text", content: text });
 
+    setStage("Reading your message");
+    setStartedAt(Date.now());
+
     try {
-      const result = await api.sendMessage(thread.id, text);
+      let result;
+      try {
+        result = await api.sendMessageStream(thread.id, text, setStage);
+      } catch (streamError) {
+        // A proxy or older server that cannot stream still gets an answer —
+        // just without the running commentary.
+        if (streamError.status && streamError.status < 500 && streamError.status !== 404) {
+          throw streamError;
+        }
+        setStage("Working on it");
+        result = await api.sendMessage(thread.id, text);
+      }
       setThread((t) => ({
         ...t,
         messages: [...t.messages.filter((m) => !String(m.id).startsWith("local-")),
@@ -426,6 +461,8 @@ export default function Chat() {
       setError(err);
     } finally {
       setBusy(false);
+      setStage(null);
+      setStartedAt(null);
       inputRef.current?.focus();
     }
   }
@@ -602,7 +639,13 @@ export default function Chat() {
                       />
                     ))}
                   </span>
-                  Testing hypotheses against your data
+                  {/* What the server says it is doing right now, and how long it
+                      has been at it. A fixed "testing hypotheses" line shown
+                      for every message — including ones that test nothing —
+                      told the person nothing, and a wait with no sign of
+                      progress reads as a hang. */}
+                  <span>{stage || "Working on it"}</span>
+                  <Elapsed since={startedAt} />
                 </div>
               )}
 

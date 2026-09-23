@@ -40,7 +40,7 @@ const TYPE_LABEL = {
  * the question next to the item it refers to — the list can hold several
  * similarly named reports.
  */
-function DocumentRow({ doc, onDelete, typeLabel }) {
+function DocumentRow({ doc, onDelete, onSubject, typeLabel, subjects }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -93,6 +93,30 @@ function DocumentRow({ doc, onDelete, typeLabel }) {
       <Badge tone={doc.type === "past_report" ? "verified" : "neutral"}>
         {typeLabel}
       </Badge>
+      {/* A typed field rather than a menu of existing subjects: a menu can
+          only offer what already exists, and when nothing is grouped yet there
+          is nothing to offer — leaving no way to create the first one. Existing
+          subjects still appear as suggestions. */}
+      <input
+        defaultValue={doc.subject || ""}
+        onBlur={(e) => {
+          const next = e.target.value.trim();
+          if (next !== (doc.subject || "")) onSubject(next);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            e.currentTarget.value = doc.subject || "";
+            e.currentTarget.blur();
+          }
+        }}
+        list="kb-subjects"
+        placeholder="no subject"
+        title="Type a subject to group this document — Enter to save"
+        className="w-[136px] shrink-0 rounded-md border bg-transparent px-2 py-1 text-[12px]
+          text-[var(--text-secondary)] placeholder:text-[var(--text-muted)]
+          focus:border-[var(--accent)] focus:outline-none"
+      />
       <button
         onClick={() => setConfirming(true)}
         aria-label={`Remove ${doc.title}`}
@@ -139,6 +163,9 @@ export default function Knowledge() {
   const [results, setResults] = useState(null);
   const [answer, setAnswer] = useState(null);
   const [brief, setBrief] = useState(null);
+  const [scopes, setScopes] = useState([]);
+  const [scope, setScope] = useState("");
+  const [subject, setSubject] = useState("");
   const [briefing, setBriefing] = useState(false);
   const [searching, setSearching] = useState(false);
 
@@ -152,8 +179,17 @@ export default function Knowledge() {
     }
   }
 
+  async function refresh() {
+    await load();
+    try {
+      setScopes((await api.knowledgeScopes()).scopes);
+    } catch {
+      /* the list still loaded; the picker can wait */
+    }
+  }
+
   useEffect(() => {
-    load();
+    refresh();
   }, []);
 
   useEffect(() => {
@@ -167,7 +203,9 @@ export default function Knowledge() {
   async function save() {
     setSaving(true);
     try {
-      await api.indexDocument({ title, text, document_type: type });
+      await api.indexDocument({
+        title, text, document_type: type, subject: subject.trim() || null,
+      });
       setTitle("");
       setText("");
       sessionStorage.removeItem(DRAFT_KEY);
@@ -182,7 +220,7 @@ export default function Knowledge() {
   async function remove(id) {
     try {
       await api.deleteDocument(id);
-      await load();
+      await refresh();
       // A result list that still shows the removed document is worse than a
       // cleared one: it suggests the removal did not take.
       setResults(null);
@@ -201,7 +239,7 @@ export default function Knowledge() {
       // Ask rather than search: someone typing a question wants an answer, and
       // the passages behind it are the evidence for that answer rather than the
       // answer itself.
-      const result = await api.askDocuments(query.trim());
+      const result = await api.askDocuments(query.trim(), 6, scope || null);
       setAnswer(result);
       setResults(result.sources || []);
     } catch (err) {
@@ -246,6 +284,27 @@ export default function Knowledge() {
               className="pl-9"
             />
           </div>
+          {/* A large crawl holds a hundred passages; an incident note holds
+              one. Ranked together, the large body wins on volume alone and the
+              one-page note that actually answers the question never surfaces.
+              Narrowing to a single body is the fix, and it doubles as a guard
+              against an answer that blends two unrelated subjects. */}
+          {scopes.length > 1 && (
+            <select
+              value={scope}
+              onChange={(e) => setScope(e.target.value)}
+              title="Limit the question to one body of knowledge"
+              className="h-10 rounded-lg border bg-[var(--surface-raised)] px-3
+                text-[13.5px] text-[var(--text-primary)]"
+            >
+              <option value="">Everything</option>
+              {scopes.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label} ({s.chunks})
+                </option>
+              ))}
+            </select>
+          )}
           <Button type="submit" variant="primary" busy={searching} disabled={!query.trim()}>
             Ask
           </Button>
@@ -260,7 +319,7 @@ export default function Knowledge() {
               setBriefing(true);
               setAnswer(null);
               try {
-                const result = await api.composeBrief(query.trim());
+                const result = await api.composeBrief(query.trim(), 14, scope || null);
                 setBrief(result.available ? result : null);
                 if (!result.available) setAnswer({ answered: false, answer: result.reason });
               } catch (err) {
@@ -285,6 +344,14 @@ export default function Knowledge() {
                 {para}
               </p>
             ))}
+            {answer.mixed_sources && (
+              <p
+                className="mt-2.5 border-l-2 pl-3 text-[12.5px] leading-relaxed"
+                style={{ borderColor: "var(--color-amber-soft)" }}
+              >
+                {answer.mixed_note}
+              </p>
+            )}
             {answer.answered && (
               <p className="mt-2.5 text-[12px] leading-relaxed text-[var(--text-muted)]">
                 {answer.note}
@@ -370,6 +437,27 @@ export default function Knowledge() {
                 business context is already on this page, and sending them to
                 another one to finish the job — losing what they had typed —
                 was worse than having two ways in. */}
+            {/* One subject for both routes below. Grouping by where a
+                document came from put a company's website and that company's
+                uploaded deck in different bodies of knowledge, so choosing
+                either one lost half the material. */}
+            <Field
+              label="Subject"
+              hint="groups this with everything else on the same subject — a site, a company, a dataset"
+            >
+              <Input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="e.g. Zylo, or Café sales"
+                list="kb-subjects"
+              />
+              <datalist id="kb-subjects">
+                {scopes.filter((x) => x.assigned).map((x) => (
+                  <option key={x.key} value={x.label} />
+                ))}
+              </datalist>
+            </Field>
+
             <Dropzone
               compact
               accept="documents"
@@ -378,8 +466,8 @@ export default function Knowledge() {
                 setUploading(true);
                 setError(null);
                 try {
-                  await api.upload(file);
-                  await load();
+                  await api.upload(file, subject.trim() || null);
+                  await refresh();
                 } catch (err) {
                   setError(err);
                 } finally {
@@ -451,16 +539,32 @@ export default function Knowledge() {
               <Skeleton className="h-4 w-1/2" />
             </div>
           ) : documents.length ? (
+            <>
+            <datalist id="kb-subjects">
+              {scopes.filter((x) => x.assigned).map((x) => (
+                <option key={x.key} value={x.label} />
+              ))}
+            </datalist>
             <ul className="divide-y">
               {documents.map((d) => (
                 <DocumentRow
                   key={d.id}
                   doc={d}
                   typeLabel={TYPE_LABEL[d.type] || d.type}
+                  subjects={scopes.filter((x) => x.assigned).map((x) => x.label)}
+                  onSubject={async (value) => {
+                    try {
+                      await api.setDocumentSubject(d.id, value || null);
+                      await refresh();
+                    } catch (err) {
+                      setError(err);
+                    }
+                  }}
                   onDelete={() => remove(d.id)}
                 />
               ))}
             </ul>
+            </>
           ) : (
             <EmptyState
               icon={BookOpen}
