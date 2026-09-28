@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { api, getToken, onSignedOut, setToken } from "./api";
 import { Sidebar, TopBar } from "./components/Nav";
+import Admin from "./pages/Admin";
 import Briefs from "./pages/Briefs";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
@@ -27,6 +28,10 @@ const PAGE = {
     subtitle: "Files, databases and pages, with provenance kept for each",
   },
   "/investigations": { title: "Investigations", subtitle: "Every question you have asked" },
+  "/admin": {
+    title: "Administration",
+    subtitle: "Who is using the system, and whether it is working",
+  },
   "/reports": { title: "Reports", subtitle: "Findings, forecasts and recommended actions" },
   "/briefs": {
     title: "Briefs",
@@ -148,6 +153,7 @@ export default function App() {
           <Route path="/investigations" element={<Investigations />} />
           <Route path="/investigations/:id" element={<InvestigationDetail />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/briefs" element={<Briefs />} />
           <Route path="/briefs/:id" element={<Briefs />} />
           <Route path="/knowledge" element={<Knowledge />} />

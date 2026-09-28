@@ -73,9 +73,13 @@ export default function Dropzone({ onFile, busy, accept = "both", compact = fals
             <p className="mt-3 text-[13.5px] font-medium">
               {over ? "Release to upload" : "Drop a file here, or click to choose"}
             </p>
+            {/* Two short lines instead of one long sentence: in the narrow
+                knowledge-base column the paragraph ran to five lines and
+                crowded out the control it was describing. */}
             <p className="mt-1 max-w-sm text-[12.5px] leading-relaxed text-[var(--text-muted)]">
-              Spreadsheets become datasets you can investigate. Documents are indexed
-              as background context the agents can retrieve.
+              {compact
+                ? "Spreadsheets become datasets. Documents are indexed as context."
+                : "Spreadsheets become datasets you can investigate. Documents are indexed as background context the agents can retrieve."}
             </p>
           </>
         )}

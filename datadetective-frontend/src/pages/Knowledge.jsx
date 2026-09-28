@@ -43,6 +43,7 @@ const TYPE_LABEL = {
 function DocumentRow({ doc, onDelete, onSubject, typeLabel, subjects }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   if (confirming) {
     return (
@@ -81,42 +82,79 @@ function DocumentRow({ doc, onDelete, onSubject, typeLabel, subjects }) {
     );
   }
 
+  // Title on its own line, controls beneath it. Side by side, the badge, the
+  // subject field and the delete button left the title 159 pixels of a 554
+  // pixel row, so every entry read "Program Transfers Allowed FALL…" while
+  // the space it needed sat empty to its right.
   return (
-    <li className="group flex items-center gap-3 px-5 py-3">
-      <BookOpen size={15} className="shrink-0 text-[var(--text-muted)]" />
+    <li className="group flex items-start gap-3 px-5 py-3">
+      <BookOpen size={15} className="mt-0.5 shrink-0 text-[var(--text-muted)]" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium">{doc.title}</p>
-        <p className="font-mono text-[11.5px] text-[var(--text-muted)]">
-          {doc.chunks} chunks
+        <p className="truncate text-[13px] font-medium" title={doc.title}>
+          {doc.title}
         </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[11.5px] text-[var(--text-muted)]">
+            {doc.chunks} chunks
+          </span>
+          <Badge tone={doc.type === "past_report" ? "verified" : "neutral"}>
+            {typeLabel}
+          </Badge>
+          {doc.subject_source === "auto" && (
+            <span
+              className="font-mono text-[10px] uppercase tracking-wide text-[var(--text-muted)]"
+              title="Filed automatically"
+            >
+              auto
+            </span>
+          )}
+          {/* A plain label until someone chooses to change it. An input on
+              every row asked a question the reader did not have — "what is a
+              subject, and what should I type?" — for a value the system now
+              works out itself. A report shows where it is filed and offers no
+              field at all, because putting one under a subject is what made a
+              past report pollute answers about the subject it mentions. */}
+          {doc.type === "past_report" ? (
+            <span className="text-[12px] text-[var(--text-muted)]">
+              filed with past reports
+            </span>
+          ) : editing ? (
+            <input
+              autoFocus
+              defaultValue={doc.subject || ""}
+              onBlur={(e) => {
+                const next = e.target.value.trim();
+                setEditing(false);
+                if (next !== (doc.subject || "")) onSubject(next);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  e.currentTarget.value = doc.subject || "";
+                  e.currentTarget.blur();
+                }
+              }}
+              list="kb-subjects"
+              placeholder="what is this about?"
+              className="min-w-[120px] flex-1 rounded-md border bg-transparent px-2 py-0.5
+                text-[12px] text-[var(--text-secondary)]
+                placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]
+                focus:outline-none"
+            />
+          ) : (
+            <button
+              onClick={() => setEditing(true)}
+              title="Change what this is filed under"
+              className="rounded px-1 text-[12px] text-[var(--text-secondary)]
+                underline decoration-dotted underline-offset-2
+                hover:text-[var(--text-primary)]"
+            >
+              {doc.subject || "not filed yet"}
+            </button>
+          )}
+        </div>
       </div>
-      <Badge tone={doc.type === "past_report" ? "verified" : "neutral"}>
-        {typeLabel}
-      </Badge>
-      {/* A typed field rather than a menu of existing subjects: a menu can
-          only offer what already exists, and when nothing is grouped yet there
-          is nothing to offer — leaving no way to create the first one. Existing
-          subjects still appear as suggestions. */}
-      <input
-        defaultValue={doc.subject || ""}
-        onBlur={(e) => {
-          const next = e.target.value.trim();
-          if (next !== (doc.subject || "")) onSubject(next);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") {
-            e.currentTarget.value = doc.subject || "";
-            e.currentTarget.blur();
-          }
-        }}
-        list="kb-subjects"
-        placeholder="no subject"
-        title="Type a subject to group this document — Enter to save"
-        className="w-[136px] shrink-0 rounded-md border bg-transparent px-2 py-1 text-[12px]
-          text-[var(--text-secondary)] placeholder:text-[var(--text-muted)]
-          focus:border-[var(--accent)] focus:outline-none"
-      />
+      
       <button
         onClick={() => setConfirming(true)}
         aria-label={`Remove ${doc.title}`}
@@ -166,6 +204,7 @@ export default function Knowledge() {
   const [scopes, setScopes] = useState([]);
   const [scope, setScope] = useState("");
   const [subject, setSubject] = useState("");
+  const [filing, setFiling] = useState(false);
   const [briefing, setBriefing] = useState(false);
   const [searching, setSearching] = useState(false);
 
@@ -178,6 +217,11 @@ export default function Knowledge() {
       setError(err);
     }
   }
+
+  // Reports are never filed under a subject, so they are not "unfiled".
+  const unfiled = (documents || []).filter(
+    (d) => d.type !== "past_report" && !d.subject,
+  ).length;
 
   async function refresh() {
     await load();
@@ -425,11 +469,11 @@ export default function Knowledge() {
         )}
       </Panel>
 
-      <div className="kb-chrome mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
+      <div className="kb-chrome mt-4 grid gap-4 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
         <Panel>
           <PanelHeader
             title="Add context"
-            description="Drop a document, or write a definition that only exists in someone's head"
+            description="A document, or a definition that only exists in someone's head"
           />
           <div className="space-y-4 p-5">
             {/* Documents can also be added from Sources, which handles every
@@ -441,16 +485,20 @@ export default function Knowledge() {
                 document came from put a company's website and that company's
                 uploaded deck in different bodies of knowledge, so choosing
                 either one lost half the material. */}
-            <Field
-              label="Subject"
-              hint="groups this with everything else on the same subject — a site, a company, a dataset"
-            >
+            <Field label="Subject">
               <Input
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="e.g. Zylo, or Café sales"
                 list="kb-subjects"
               />
+              {/* Below the field rather than beside the label: in a narrow
+                  column a long hint pushed the label onto its own line and
+                  broke into three. */}
+              <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-muted)]">
+                Groups this with everything else on the same subject. Leave it
+                empty and it is worked out from the document.
+              </p>
               <datalist id="kb-subjects">
                 {scopes.filter((x) => x.assigned).map((x) => (
                   <option key={x.key} value={x.label} />
@@ -532,6 +580,30 @@ export default function Knowledge() {
           <PanelHeader
             title="Indexed"
             description={documents ? `${documents.length} items` : undefined}
+            action={
+              unfiled > 0 ? (
+                // Filing is automatic for anything added from now on; this is
+                // for what was already here when that started.
+                <Button
+                  size="sm"
+                  busy={filing}
+                  onClick={async () => {
+                    setFiling(true);
+                    setError(null);
+                    try {
+                      await api.autoSubject();
+                      await refresh();
+                    } catch (err) {
+                      setError(err);
+                    } finally {
+                      setFiling(false);
+                    }
+                  }}
+                >
+                  File {unfiled} automatically
+                </Button>
+              ) : undefined
+            }
           />
           {documents === null ? (
             <div className="space-y-3 p-5">

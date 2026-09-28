@@ -115,7 +115,10 @@ export const api = {
     request("/api/sources/crawl", { method: "POST", body: payload }),
   composeBrief: (query, topK = 14, scope = null) =>
     request("/api/brief", { method: "POST", body: { query, top_k: topK, scope } }),
+  adminOverview: () => request("/api/admin/overview"),
   knowledgeScopes: () => request("/api/knowledge/scopes"),
+  autoSubject: () =>
+    request("/api/documents/auto-subject", { method: "POST" }),
   setDocumentSubject: (id, subject) =>
     request(`/api/documents/${id}/subject`, { method: "PATCH", body: { subject } }),
   briefs: () => request("/api/briefs"),

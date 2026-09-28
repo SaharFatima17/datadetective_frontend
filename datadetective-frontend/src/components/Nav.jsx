@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   BookOpen,
+  ShieldCheck,
   FileSearch,
   Database,
   MessageSquare,
@@ -23,6 +24,11 @@ const NAV = [
   { to: "/briefs", label: "Briefs", icon: FileSearch },
   { to: "/knowledge", label: "Knowledge base", icon: BookOpen },
 ];
+
+// Shown only to administrators. The page reports usage, not content, so it is
+// not a way into anyone's data — but there is no reason to show a door to
+// people who cannot open it.
+const ADMIN_NAV = { to: "/admin", label: "Administration", icon: ShieldCheck };
 
 function Mark() {
   return (
@@ -66,7 +72,7 @@ export function Sidebar({ open, onClose, user, onSignOut, provider }) {
         </div>
 
         <nav className="flex-1 space-y-0.5 px-3 py-3">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
+          {[...NAV, ...(user?.role === "admin" ? [ADMIN_NAV] : [])].map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

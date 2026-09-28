@@ -369,6 +369,39 @@ export default function ReportDocument({ report, state, calculations = {},
         </section>
       )}
 
+      {/* ----------------------- direction warning ---------------------------- */}
+      {report.mix_warning && (
+        <section className="mt-6">
+          <div
+            className="rounded-lg border-l-4 py-4 pl-5 pr-4"
+            style={{ borderColor: "var(--color-amber-soft)" }}
+          >
+            <p
+              className="text-[12px] font-semibold uppercase tracking-wide"
+              style={{ color: "var(--color-amber-soft)" }}
+            >
+              Read the total with care
+            </p>
+            <p className="mt-1.5 max-w-[68ch] text-[14px] leading-relaxed">
+              {report.mix_warning.note}
+            </p>
+            <ul className="mt-2 space-y-0.5">
+              {report.mix_warning.groups.map((g) => (
+                <li
+                  key={g.group}
+                  className="font-mono text-[12px] text-[var(--text-secondary)]"
+                >
+                  {g.group}: {g.avg_before} → {g.avg_after} (
+                  {g.avg_change_pct > 0 ? "+" : ""}
+                  {g.avg_change_pct}%), share of rows {g.share_before}% →{" "}
+                  {g.share_after}%
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
       {/* ------------------------ against last time --------------------------- */}
       {comparison?.available && (
         <section className="mt-7 rise" style={{ animationDelay: "0.28s" }}>
